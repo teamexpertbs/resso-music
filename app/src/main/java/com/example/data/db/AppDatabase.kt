@@ -41,6 +41,12 @@ interface SongDao {
 
     @Query("SELECT COUNT(*) FROM songs")
     suspend fun getSongCount(): Int
+
+    @Query("UPDATE songs SET lyricsLrc = :lyrics WHERE id = :id")
+    suspend fun updateSongLyrics(id: String, lyrics: String)
+
+    @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR genre LIKE '%' || :query || '%'")
+    suspend fun searchLocalSongs(query: String): List<SongEntity>
 }
 
 @Dao

@@ -7,6 +7,7 @@ import com.example.data.model.CommentEntity
 import com.example.data.model.PlaylistEntity
 import com.example.data.model.SongEntity
 import com.example.data.model.VibeEntity
+import com.example.data.network.MusicSearchService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.Flow
@@ -23,6 +24,7 @@ class MusicRepository(context: Context) {
     val vibeDao = db.vibeDao()
     val commentDao = db.commentDao()
     val playlistDao = db.playlistDao()
+    val searchService = MusicSearchService()
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -36,6 +38,12 @@ class MusicRepository(context: Context) {
     suspend fun toggleLike(id: String, currentLiked: Boolean) = songDao.setLiked(id, !currentLiked)
     suspend fun insertCustomSong(song: SongEntity) = songDao.insertSong(song)
     suspend fun updateSongVibe(songId: String, vibeUri: String) = songDao.updateSongVibe(songId, vibeUri)
+
+    // Online & Local Search
+    suspend fun searchSongsOnline(query: String): List<SongEntity> = searchService.searchSongs(query)
+    suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
+    suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
+    suspend fun updateSongLyrics(songId: String, lyrics: String) = songDao.updateSongLyrics(songId, lyrics)
 
     // Vibes
     fun getVibesForSong(songId: String): Flow<List<VibeEntity>> = vibeDao.getVibesForSong(songId)
@@ -57,8 +65,6 @@ class MusicRepository(context: Context) {
     }
 
     private suspend fun seedInitialDataIfEmpty() {
-        if (songDao.getSongCount() > 0) return
-
         val sampleSongs = listOf(
             SongEntity(
                 id = "song_1",
@@ -181,6 +187,79 @@ class MusicRepository(context: Context) {
                 """.trimIndent(),
                 genre = "Rock / Workout",
                 mood = "Workout",
+                isLiked = false
+            ),
+            SongEntity(
+                id = "song_kesariya",
+                title = "Kesariya",
+                artist = "Arijit Singh, Pritam",
+                album = "Brahmastra",
+                durationMs = 268000L,
+                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/44/26/50/442650b7-256e-034a-380a-4bbf16e59e53/mzaf_272051127111758324.plus.aac.p.m4a",
+                albumArtUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
+                lyricsLrc = """
+                    [00:00.00] (Romantic Flute & Acoustic Intro)
+                    [00:06.00] Mujhko itna bataye koi
+                    [00:12.00] Kaise tujhse dil na lagaye koi
+                    [00:18.00] Rabba ne tujhko banane mein
+                    [00:24.00] Kar di hai husn ki khaali tijoriyan
+                    [00:30.00] Kajal ki siyahi se likhi hai tune
+                    [00:36.00] Jaane kitno ki love storiyan
+                    [00:43.00] Kesariya tera ishq hai piya
+                    [00:49.00] Rang jaaun jo main haath lagaun
+                    [00:55.00] Din beete saara teri fikr mein
+                    [01:01.00] Rain saari teri khair manaun
+                """.trimIndent(),
+                genre = "Bollywood",
+                mood = "Romance",
+                isLiked = true
+            ),
+            SongEntity(
+                id = "song_295",
+                title = "295",
+                artist = "Sidhu Moose Wala",
+                album = "Moosetape",
+                durationMs = 270000L,
+                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/6c/2b/b5/6c2bb54c-cbb6-558e-87e6-cc750aa39c54/mzaf_11043876483606963092.plus.aac.p.m4a",
+                albumArtUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80",
+                lyricsLrc = """
+                    [00:00.00] (Heavy 808 Punjabi Beat Drops)
+                    [00:06.00] Sidhu Moose Wala
+                    [00:10.00] The Kidd!
+                    [00:14.00] Dass kihda aithey sach bolda
+                    [00:19.00] Kihda rab de naal match karda
+                    [00:24.00] Nitt nawa koyi vivaad khada
+                    [00:29.00] Jeda sach bole ohi baad khada
+                    [00:35.00] Dhara 295 je lagdi ae
+                    [00:41.00] Kise sach bolan te khed chaldi ae
+                    [00:48.00] Aithe sachian te pabandi ae
+                    [00:54.00] Jithe jhooth di chadhdi chandi ae
+                """.trimIndent(),
+                genre = "Punjabi",
+                mood = "Party",
+                isLiked = true
+            ),
+            SongEntity(
+                id = "song_lover",
+                title = "Lover",
+                artist = "Diljit Dosanjh",
+                album = "MoonChild Era",
+                durationMs = 210000L,
+                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a9/82/78/a9827837-5ca7-1fe3-fc24-3dedeffb86e4/mzaf_4678729972431007397.plus.aac.p.m4a",
+                albumArtUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
+                lyricsLrc = """
+                    [00:00.00] (Synthesizer & Upbeat Pop Rhythm)
+                    [00:05.00] Diljit Dosanjh!
+                    [00:08.00] Intense music
+                    [00:12.00] Tera ni lover, tera ni lover
+                    [00:17.00] Karda pyaar tenu kina sara
+                    [00:22.00] Vekh le akhiyan vich tu yaara
+                    [00:27.00] Tere bina lagda nahi dil mera
+                    [00:32.00] Tu hi ban gayi ae sahara
+                    [00:38.00] Tera ni lover, tera ni lover!
+                """.trimIndent(),
+                genre = "Punjabi Pop",
+                mood = "Party",
                 isLiked = false
             )
         )

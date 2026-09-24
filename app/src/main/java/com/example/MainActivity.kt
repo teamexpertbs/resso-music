@@ -39,20 +39,25 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DrawerValue
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -71,6 +76,7 @@ import com.example.ui.explore.ExploreScreen
 import com.example.ui.library.LibraryScreen
 import com.example.ui.lyrics.LyricPosterDialog
 import com.example.ui.player.VibePlayerScreen
+import com.example.ui.sidebar.SidebarDrawerContent
 import com.example.ui.theme.MyApplicationTheme
 import com.example.ui.theme.RessoBackground
 import com.example.ui.theme.RessoCardBg
@@ -80,6 +86,7 @@ import com.example.ui.theme.RessoSurface
 import com.example.ui.theme.RessoTextSecondary
 import com.example.ui.vibe.VibeCreatorScreen
 import com.example.ui.viewmodel.MusicViewModel
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     private val musicViewModel: MusicViewModel by viewModels()
@@ -114,156 +121,189 @@ class MainActivity : ComponentActivity() {
                 }
 
                 var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library", "vibe_creator"
+                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+                val coroutineScope = rememberCoroutineScope()
 
                 val isCommentsOpen by musicViewModel.isCommentsSheetOpen.collectAsState()
                 val isPosterOpen by musicViewModel.isPosterDialogOpen.collectAsState()
                 val currentSong by musicViewModel.currentSong.collectAsState()
                 val isPlaying by musicViewModel.isPlaying.collectAsState()
 
-                Scaffold(
-                    bottomBar = {
-                        if (currentTab != "vibe_creator") {
-                            Column {
-                                // Mini player bar when navigating outside the main For You player
-                                if (currentTab != "foryou" && currentSong != null) {
-                                    MiniPlayerBar(
-                                        songTitle = currentSong?.title ?: "",
-                                        artist = currentSong?.artist ?: "",
-                                        albumArtUrl = currentSong?.albumArtUrl ?: "",
-                                        isPlaying = isPlaying,
-                                        onTogglePlay = { musicViewModel.togglePlayPause() },
-                                        onOpenPlayer = { currentTab = "foryou" }
-                                    )
-                                }
-
-                                NavigationBar(
-                                    containerColor = RessoBackground.copy(alpha = 0.95f),
-                                    contentColor = Color.White,
-                                    modifier = Modifier.navigationBarsPadding().testTag("main_bottom_nav_bar")
-                                ) {
-                                    NavigationBarItem(
-                                        selected = currentTab == "foryou",
-                                        onClick = { currentTab = "foryou" },
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.MusicVideo,
-                                                contentDescription = "For You",
-                                                tint = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                "For You",
-                                                color = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary,
-                                                fontWeight = if (currentTab == "foryou") FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = Color.Transparent
-                                        ),
-                                        modifier = Modifier.testTag("nav_item_for_you")
-                                    )
-
-                                    NavigationBarItem(
-                                        selected = currentTab == "explore",
-                                        onClick = { currentTab = "explore" },
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.Search,
-                                                contentDescription = "Search",
-                                                tint = if (currentTab == "explore") RessoPrimary else RessoTextSecondary
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                "Search",
-                                                color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
-                                                fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = Color.Transparent
-                                        ),
-                                        modifier = Modifier.testTag("nav_item_search")
-                                    )
-
-                                    NavigationBarItem(
-                                        selected = currentTab == "library",
-                                        onClick = { currentTab = "library" },
-                                        icon = {
-                                            Icon(
-                                                imageVector = Icons.Default.LibraryMusic,
-                                                contentDescription = "Library",
-                                                tint = if (currentTab == "library") RessoPrimary else RessoTextSecondary
-                                            )
-                                        },
-                                        label = {
-                                            Text(
-                                                "Library",
-                                                color = if (currentTab == "library") RessoPrimary else RessoTextSecondary,
-                                                fontWeight = if (currentTab == "library") FontWeight.Bold else FontWeight.Normal
-                                            )
-                                        },
-                                        colors = NavigationBarItemDefaults.colors(
-                                            indicatorColor = Color.Transparent
-                                        ),
-                                        modifier = Modifier.testTag("nav_item_library")
-                                    )
-                                }
-                            }
-                        }
-                    },
-                    containerColor = RessoBackground,
-                    modifier = Modifier.fillMaxSize()
-                ) { innerPadding ->
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = if (currentTab == "vibe_creator") 0.dp else innerPadding.calculateBottomPadding())
-                    ) {
-                        when (currentTab) {
-                            "foryou" -> {
-                                VibePlayerScreen(
-                                    viewModel = musicViewModel,
-                                    onOpenVibeCreator = { currentTab = "vibe_creator" },
-                                    onNavigateToSearch = { currentTab = "explore" }
-                                )
-                            }
-                            "explore" -> {
-                                ExploreScreen(
-                                    viewModel = musicViewModel,
-                                    onSongSelected = { currentTab = "foryou" }
-                                )
-                            }
-                            "library" -> {
-                                LibraryScreen(
-                                    viewModel = musicViewModel,
-                                    onSongSelected = { currentTab = "foryou" },
-                                    onOpenVibeCreator = { currentTab = "vibe_creator" }
-                                )
-                            }
-                            "vibe_creator" -> {
-                                VibeCreatorScreen(
-                                    viewModel = musicViewModel,
-                                    onNavigateBack = { currentTab = "foryou" }
-                                )
-                            }
-                        }
-
-                        // Comments Bottom Sheet
-                        if (isCommentsOpen) {
-                            CommentsBottomSheet(
+                ModalNavigationDrawer(
+                    drawerState = drawerState,
+                    gesturesEnabled = currentTab != "vibe_creator",
+                    drawerContent = {
+                        ModalDrawerSheet(
+                            drawerContainerColor = RessoBackground,
+                            drawerContentColor = Color.White,
+                            modifier = Modifier.width(320.dp)
+                        ) {
+                            SidebarDrawerContent(
                                 viewModel = musicViewModel,
-                                onDismiss = { musicViewModel.setCommentsSheetOpen(false) }
+                                currentTab = currentTab,
+                                onNavigateToTab = { tab ->
+                                    currentTab = tab
+                                    coroutineScope.launch { drawerState.close() }
+                                },
+                                onOpenVibeCreator = {
+                                    currentTab = "vibe_creator"
+                                    coroutineScope.launch { drawerState.close() }
+                                },
+                                onCloseDrawer = {
+                                    coroutineScope.launch { drawerState.close() }
+                                }
                             )
                         }
+                    }
+                ) {
+                    Scaffold(
+                        bottomBar = {
+                            if (currentTab != "vibe_creator") {
+                                Column {
+                                    // Mini player bar when navigating outside the main For You player
+                                    if (currentTab != "foryou" && currentSong != null) {
+                                        MiniPlayerBar(
+                                            songTitle = currentSong?.title ?: "",
+                                            artist = currentSong?.artist ?: "",
+                                            albumArtUrl = currentSong?.albumArtUrl ?: "",
+                                            isPlaying = isPlaying,
+                                            onTogglePlay = { musicViewModel.togglePlayPause() },
+                                            onOpenPlayer = { currentTab = "foryou" }
+                                        )
+                                    }
 
-                        // Lyric Poster Dialog
-                        if (isPosterOpen) {
-                            LyricPosterDialog(
-                                viewModel = musicViewModel,
-                                onDismiss = { musicViewModel.closeLyricPosterDialog() }
-                            )
+                                    NavigationBar(
+                                        containerColor = RessoBackground.copy(alpha = 0.95f),
+                                        contentColor = Color.White,
+                                        modifier = Modifier.navigationBarsPadding().testTag("main_bottom_nav_bar")
+                                    ) {
+                                        NavigationBarItem(
+                                            selected = currentTab == "foryou",
+                                            onClick = { currentTab = "foryou" },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.MusicVideo,
+                                                    contentDescription = "For You",
+                                                    tint = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary
+                                                )
+                                            },
+                                            label = {
+                                                Text(
+                                                    "For You",
+                                                    color = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary,
+                                                    fontWeight = if (currentTab == "foryou") FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            colors = NavigationBarItemDefaults.colors(
+                                                indicatorColor = Color.Transparent
+                                            ),
+                                            modifier = Modifier.testTag("nav_item_for_you")
+                                        )
+
+                                        NavigationBarItem(
+                                            selected = currentTab == "explore",
+                                            onClick = { currentTab = "explore" },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.Search,
+                                                    contentDescription = "Search",
+                                                    tint = if (currentTab == "explore") RessoPrimary else RessoTextSecondary
+                                                )
+                                            },
+                                            label = {
+                                                Text(
+                                                    "Search",
+                                                    color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
+                                                    fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            colors = NavigationBarItemDefaults.colors(
+                                                indicatorColor = Color.Transparent
+                                            ),
+                                            modifier = Modifier.testTag("nav_item_search")
+                                        )
+
+                                        NavigationBarItem(
+                                            selected = currentTab == "library",
+                                            onClick = { currentTab = "library" },
+                                            icon = {
+                                                Icon(
+                                                    imageVector = Icons.Default.LibraryMusic,
+                                                    contentDescription = "Library",
+                                                    tint = if (currentTab == "library") RessoPrimary else RessoTextSecondary
+                                                )
+                                            },
+                                            label = {
+                                                Text(
+                                                    "Library",
+                                                    color = if (currentTab == "library") RessoPrimary else RessoTextSecondary,
+                                                    fontWeight = if (currentTab == "library") FontWeight.Bold else FontWeight.Normal
+                                                )
+                                            },
+                                            colors = NavigationBarItemDefaults.colors(
+                                                indicatorColor = Color.Transparent
+                                            ),
+                                            modifier = Modifier.testTag("nav_item_library")
+                                        )
+                                    }
+                                }
+                            }
+                        },
+                        containerColor = RessoBackground,
+                        modifier = Modifier.fillMaxSize()
+                    ) { innerPadding ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = if (currentTab == "vibe_creator") 0.dp else innerPadding.calculateBottomPadding())
+                        ) {
+                            when (currentTab) {
+                                "foryou" -> {
+                                    VibePlayerScreen(
+                                        viewModel = musicViewModel,
+                                        onOpenVibeCreator = { currentTab = "vibe_creator" },
+                                        onNavigateToSearch = { currentTab = "explore" },
+                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
+                                    )
+                                }
+                                "explore" -> {
+                                    ExploreScreen(
+                                        viewModel = musicViewModel,
+                                        onSongSelected = { currentTab = "foryou" },
+                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
+                                    )
+                                }
+                                "library" -> {
+                                    LibraryScreen(
+                                        viewModel = musicViewModel,
+                                        onSongSelected = { currentTab = "foryou" },
+                                        onOpenVibeCreator = { currentTab = "vibe_creator" },
+                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
+                                    )
+                                }
+                                "vibe_creator" -> {
+                                    VibeCreatorScreen(
+                                        viewModel = musicViewModel,
+                                        onNavigateBack = { currentTab = "foryou" }
+                                    )
+                                }
+                            }
+
+                            // Comments Bottom Sheet
+                            if (isCommentsOpen) {
+                                CommentsBottomSheet(
+                                    viewModel = musicViewModel,
+                                    onDismiss = { musicViewModel.setCommentsSheetOpen(false) }
+                                )
+                            }
+
+                            // Lyric Poster Dialog
+                            if (isPosterOpen) {
+                                LyricPosterDialog(
+                                    viewModel = musicViewModel,
+                                    onDismiss = { musicViewModel.closeLyricPosterDialog() }
+                                )
+                            }
                         }
                     }
                 }

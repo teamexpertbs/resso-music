@@ -103,12 +103,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val searchQuery = MutableStateFlow("")
     val selectedMood = MutableStateFlow<String?>(null)
 
+    private val _searchResults = MutableStateFlow<List<SongEntity>>(emptyList())
+    val searchResults: StateFlow<List<SongEntity>> = _searchResults.asStateFlow()
+
+    private val _isSearching = MutableStateFlow(false)
+    val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
+
+    private val _searchError = MutableStateFlow<String?>(null)
+    val searchError: StateFlow<String?> = _searchError.asStateFlow()
+
+    private val _trendingSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val trendingSongs: StateFlow<List<SongEntity>> = _trendingSongs.asStateFlow()
+
+    private var searchJob: Job? = null
     private var progressJob: Job? = null
     private var commentsJob: Job? = null
 
     init {
         setupPlayerListener()
         startProgressTracking()
+        loadTrendingSongs()
 
         viewModelScope.launch {
             allSongs.collect { songs ->
@@ -117,6 +131,116 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
             }
         }
+    }
+
+    private fun loadTrendingSongs() {
+        viewModelScope.launch {
+            try {
+                val trending = repository.searchSongsOnline("Bollywood hits")
+                if (trending.isNotEmpty()) {
+                    _trendingSongs.value = trending
+                }
+            } catch (_: Exception) {
+            }
+        }
+    }
+
+    fun searchMusic(query: String) {
+        searchJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            _searchResults.value = emptyList()
+            _isSearching.value = false
+            _searchError.value = null
+            return
+        }
+
+        searchJob = viewModelScope.launch {
+            _isSearching.value = true
+            _searchError.value = null
+            try {
+                // 1. Gather matching local songs
+                val localMatches = repository.searchLocalSongs(trimmed)
+
+                // 2. Search online songs from iTunes catalog
+                val onlineMatches = repository.searchSongsOnline(trimmed)
+
+                // 3. Combine without duplicate entries
+                val combined = mutableListOf<SongEntity>()
+                combined.addAll(localMatches)
+                val existingKeys = localMatches.map { "${it.title.lowercase()}_${it.artist.lowercase()}" }.toSet()
+
+                for (song in onlineMatches) {
+                    val key = "${song.title.lowercase()}_${song.artist.lowercase()}"
+                    if (key !in existingKeys && combined.none { it.id == song.id }) {
+                        combined.add(song)
+                    }
+                }
+
+                _searchResults.value = combined
+                if (combined.isEmpty()) {
+                    _searchError.value = "No songs found for '$trimmed'"
+                }
+            } catch (e: Exception) {
+                _searchError.value = "Search error: ${e.localizedMessage ?: "Unknown error"}"
+            } finally {
+                _isSearching.value = false
+            }
+        }
+    }
+
+    fun playSongFromAnywhere(song: SongEntity, autoPlay: Boolean = true) {
+        viewModelScope.launch {
+            // Save to database so it exists in Room and persists across app restarts
+            val existing = repository.getSongById(song.id)
+            if (existing == null) {
+                repository.insertCustomSong(song)
+            }
+
+            val allCurrent = allSongs.value
+            val existingIndex = allCurrent.indexOfFirst { it.id == song.id }
+            val indexToUse = if (existingIndex >= 0) existingIndex else allCurrent.size
+
+            selectSong(song, indexToUse, autoPlay = autoPlay)
+
+            // Fetch synced lyrics if not already present
+            if (song.lyricsLrc.isBlank()) {
+                fetchAndApplyLyrics(song)
+            }
+        }
+    }
+
+    private fun fetchAndApplyLyrics(song: SongEntity) {
+        viewModelScope.launch {
+            val fetchedLyrics = repository.fetchLyrics(song.artist, song.title)
+            if (!fetchedLyrics.isNullOrBlank()) {
+                repository.updateSongLyrics(song.id, fetchedLyrics)
+                if (_currentSong.value?.id == song.id) {
+                    _currentSong.value = _currentSong.value?.copy(lyricsLrc = fetchedLyrics)
+                    _lyrics.value = LyricsParser.parse(fetchedLyrics)
+                }
+            } else {
+                val fallbackLrc = buildFallbackLyrics(song)
+                repository.updateSongLyrics(song.id, fallbackLrc)
+                if (_currentSong.value?.id == song.id) {
+                    _currentSong.value = _currentSong.value?.copy(lyricsLrc = fallbackLrc)
+                    _lyrics.value = LyricsParser.parse(fallbackLrc)
+                }
+            }
+        }
+    }
+
+    private fun buildFallbackLyrics(song: SongEntity): String {
+        return """
+            [00:00.00] ♪ Now playing: ${song.title} ♪
+            [00:05.00] 🎤 ${song.artist}
+            [00:10.00] Feel the rhythm & bass drop...
+            [00:18.00] ✨ High Fidelity Audio Streaming ✨
+            [00:26.00] Enjoying the vibe on Resso Music
+            [00:35.00] Tap to share lyric poster or create vibe video
+            [00:45.00] ♪ Let the rhythm flow ♪
+            [00:55.00] ${song.album}
+        """.trimIndent()
     }
 
     private fun setupPlayerListener() {
@@ -261,9 +385,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleLikeSong(song: SongEntity) {
         viewModelScope.launch {
-            repository.toggleLike(song.id, song.isLiked)
+            val existing = repository.getSongById(song.id)
+            val newLikedState = !song.isLiked
+            if (existing == null) {
+                repository.insertCustomSong(song.copy(isLiked = newLikedState))
+            } else {
+                repository.toggleLike(song.id, song.isLiked)
+            }
             if (_currentSong.value?.id == song.id) {
-                _currentSong.value = song.copy(isLiked = !song.isLiked)
+                _currentSong.value = _currentSong.value?.copy(isLiked = newLikedState)
+            }
+            _searchResults.value = _searchResults.value.map {
+                if (it.id == song.id) it.copy(isLiked = newLikedState) else it
+            }
+            _trendingSongs.value = _trendingSongs.value.map {
+                if (it.id == song.id) it.copy(isLiked = newLikedState) else it
             }
         }
     }
@@ -321,6 +457,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun applyVibeToCurrent(vibe: VibeEntity) {
         _currentVibeUri.value = vibe.videoUri
         _currentVibeFilter.value = vibe.filterType
+    }
+
+    fun setVibeFilter(filter: String) {
+        _currentVibeFilter.value = filter
+    }
+
+    fun clearVibeVideo() {
+        _currentVibeUri.value = null
     }
 
     // Comments Sheet

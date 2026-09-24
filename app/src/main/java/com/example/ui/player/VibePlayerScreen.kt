@@ -43,6 +43,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -51,6 +52,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
+import androidx.compose.material.icons.filled.Tune
 import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Badge
@@ -101,6 +103,7 @@ fun VibePlayerScreen(
     viewModel: MusicViewModel,
     onOpenVibeCreator: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
+    onOpenSidebar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSong by viewModel.currentSong.collectAsState()
@@ -263,27 +266,47 @@ fun VibePlayerScreen(
             }
         }
 
-        // 3. Top Header: Song Info / Mood Tag
+        // 3. Top Header: Sidebar Menu, Song Info / Mood Tag & Quick Search
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp, start = 20.dp, end = 20.dp),
+                .padding(top = 48.dp, start = 16.dp, end = 16.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column {
-                Text(
-                    text = "VIBE STREAM",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Black,
-                    color = RessoSecondary,
-                    letterSpacing = 2.sp
-                )
-                Text(
-                    text = "${currentSong?.mood ?: "Chill"} • ${currentSong?.genre ?: "Pop"}",
-                    fontSize = 11.sp,
-                    color = Color.White.copy(alpha = 0.7f)
-                )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                IconButton(
+                    onClick = onOpenSidebar,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .testTag("open_sidebar_button")
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Menu,
+                        contentDescription = "Open Sidebar Menu",
+                        tint = Color.White,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(10.dp))
+
+                Column {
+                    Text(
+                        text = "VIBE STREAM",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Black,
+                        color = RessoSecondary,
+                        letterSpacing = 2.sp
+                    )
+                    Text(
+                        text = "${currentSong?.mood ?: "Chill"} • ${currentSong?.genre ?: "Pop"}",
+                        fontSize = 11.sp,
+                        color = Color.White.copy(alpha = 0.7f)
+                    )
+                }
             }
 
             // Top Quick Actions: Search Songs & Upload Device Song
@@ -333,7 +356,7 @@ fun VibePlayerScreen(
             }
         }
 
-        // 4. Right Side Action Bar (Resso signature vertical action strip)
+        // 4. Right Side Action Bar (Clean Resso vertical action strip - Vibe, Flash, Boost moved to Sidebar)
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
@@ -361,15 +384,6 @@ fun VibePlayerScreen(
                 )
             }
 
-            // Vibe Creator Button
-            PlayerActionButton(
-                icon = Icons.Default.AutoAwesome,
-                label = "Vibe",
-                tint = RessoSecondary,
-                tag = "player_vibe_creator_button",
-                onClick = onOpenVibeCreator
-            )
-
             // Lyric Poster Button
             PlayerActionButton(
                 icon = Icons.Default.FormatQuote,
@@ -381,44 +395,13 @@ fun VibePlayerScreen(
                 }
             )
 
-            // Flash Sync Toggle Button (Back Torch Flashes to Song Beats)
+            // Sidebar Tools Button (Quick drawer opener)
             PlayerActionButton(
-                icon = Icons.Default.FlashOn,
-                label = if (isFlashSync) "Flash On" else "Flash",
-                tint = if (isFlashSync) RessoGreen else Color.White.copy(alpha = 0.6f),
-                tag = "player_flash_sync_button",
-                onClick = {
-                    val hasCam = ContextCompat.checkSelfPermission(
-                        context,
-                        Manifest.permission.CAMERA
-                    ) == PackageManager.PERMISSION_GRANTED
-                    if (hasCam) {
-                        viewModel.toggleFlashSync()
-                        Toast.makeText(
-                            context,
-                            if (!isFlashSync) "⚡ Beat Flash: ON (Song beat par flashlight chalegi)" else "⚡ Beat Flash: OFF (Torch band)",
-                            Toast.LENGTH_SHORT
-                        ).show()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }
-            )
-
-            // Volume Booster Toggle Button
-            PlayerActionButton(
-                icon = Icons.Default.VolumeUp,
-                label = if (isVolumeBooster) "+150%" else "Boost",
-                tint = if (isVolumeBooster) RessoPrimary else Color.White.copy(alpha = 0.6f),
-                tag = "player_volume_booster_button",
-                onClick = {
-                    viewModel.toggleVolumeBooster()
-                    Toast.makeText(
-                        context,
-                        if (!isVolumeBooster) "Volume Boost: +150% Active" else "Volume Boost: Normal",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                icon = Icons.Default.Tune,
+                label = "Tools",
+                tint = RessoSecondary,
+                tag = "player_tools_sidebar_button",
+                onClick = onOpenSidebar
             )
         }
 
