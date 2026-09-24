@@ -26,17 +26,27 @@ jobs:
           java-version: '17'
           cache: 'gradle'
 
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Setup Android SDK Environment & Accept Licenses
+        run: |
+          echo "Setting up Android SDK licenses..."
+          # GitHub Actions ubuntu-latest already has Android SDK pre-installed in $ANDROID_HOME
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          # Accept all common Android SDK licenses automatically
+          echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "d56f5187479451eabf01fb78ba6edcb79e141608" >> "$ANDROID_HOME/licenses/android-sdk-license"
+          echo "84831b9409646a918e30573bab4c9c91346d8abd" >> "$ANDROID_HOME/licenses/android-sdk-preview-license"
+          echo "856525267a72de711a6730b7f341b9d21645e946" >> "$ANDROID_HOME/licenses/android-googletv-license"
+          echo "601085b94cd77f0b54ff86406957099fed7926c0" >> "$ANDROID_HOME/licenses/android-googlexr-license"
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
 
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.11.1'
+          gradle-version: '9.3.1'
 
-      - name: Prepare Android Build Environment
+      - name: Prepare Android Build Secrets & Keystore
         run: |
-          echo "Preparing environment..."
+          echo "Preparing environment and signing keys..."
           touch .env
           touch .env.example
           # Generate debug.keystore if not present
@@ -62,7 +72,7 @@ jobs:
           path: output_apk/Resso-Music.apk
           retention-days: 30
 
-      - name: Create GitHub Release (Optional on manual trigger)
+      - name: Create GitHub Release (On Manual Trigger)
         if: github.event_name == 'workflow_dispatch'
         uses: softprops/action-gh-release@v2
         with:
