@@ -53,7 +53,6 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -309,7 +308,7 @@ fun VibePlayerScreen(
                 }
             }
 
-            // Top Quick Actions: Search Songs & Upload Device Song
+            // Top Quick Actions: Search Songs
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
@@ -331,26 +330,6 @@ fun VibePlayerScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Search", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .clickable { audioPickerLauncher.launch("audio/*") }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .testTag("import_audio_chip")
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.UploadFile,
-                            contentDescription = "Upload MP3",
-                            tint = RessoPrimary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Play MP3", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
