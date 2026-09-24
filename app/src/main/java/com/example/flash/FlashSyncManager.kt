@@ -4,8 +4,6 @@ import android.content.Context
 import android.hardware.camera2.CameraAccessException
 import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
-import android.os.Handler
-import android.os.Looper
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -16,7 +14,10 @@ import kotlinx.coroutines.launch
 class FlashSyncManager(private val context: Context) {
     private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
     private var cameraId: String? = null
-    private var isTorchOn = false
+    var isTorchOn = false
+        private set
+    var isBeatSyncRunning = false
+        private set
     private var flashJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default)
 
@@ -29,25 +30,28 @@ class FlashSyncManager(private val context: Context) {
             cameraManager?.cameraIdList?.forEach { id ->
                 val characteristics = cameraManager.getCameraCharacteristics(id)
                 val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-                if (hasFlash) {
+                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                // Prefer BACK camera for flashlight torch
+                if (hasFlash && (facing == CameraCharacteristics.LENS_FACING_BACK || cameraId == null)) {
                     cameraId = id
-                    return
+                    if (facing == CameraCharacteristics.LENS_FACING_BACK) return
                 }
             }
-        } catch (_: Exception) {
+        } catch (e: Exception) {
             cameraId = null
         }
     }
 
     fun startSync(bpm: Int = 120) {
         stopSync()
-        val intervalMs = (60_000 / bpm).coerceIn(200, 800)
+        isBeatSyncRunning = true
+        val intervalMs = (60_000 / bpm.coerceIn(60, 200)).toLong()
         flashJob = scope.launch {
             while (isActive) {
                 setFlash(true)
-                delay(80)
+                delay(65)
                 setFlash(false)
-                delay(intervalMs - 80L)
+                delay((intervalMs - 65L).coerceAtLeast(80L))
             }
         }
     }
@@ -61,9 +65,17 @@ class FlashSyncManager(private val context: Context) {
     }
 
     fun stopSync() {
+        isBeatSyncRunning = false
         flashJob?.cancel()
         flashJob = null
         setFlash(false)
+    }
+
+    fun toggleSteadyTorch(): Boolean {
+        stopSync()
+        val newState = !isTorchOn
+        setFlash(newState)
+        return newState
     }
 
     private fun setFlash(on: Boolean) {
@@ -71,8 +83,10 @@ class FlashSyncManager(private val context: Context) {
         try {
             cameraManager?.setTorchMode(cid, on)
             isTorchOn = on
-        } catch (_: CameraAccessException) {
-        } catch (_: Exception) {
+        } catch (e: CameraAccessException) {
+            isTorchOn = false
+        } catch (e: Exception) {
+            isTorchOn = false
         }
     }
 }

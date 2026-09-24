@@ -498,16 +498,59 @@ export default function App() {
     return () => document.removeEventListener('visibilitychange', handleBackgroundPlayback)
   }, [isPlaying])
 
+  // Torch track ref for hardware back flashlight
+  const torchTrackRef = useRef(null)
+
+  const toggleFlashSyncHandler = async () => {
+    const nextState = !isFlashSync
+    setIsFlashSync(nextState)
+    if (nextState) {
+      showToast("⚡ Beat Flash: ON (Song beat par flashlight chalegi)")
+      try {
+        if (navigator.mediaDevices?.getUserMedia) {
+          const stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' } }
+          })
+          const track = stream.getVideoTracks()[0]
+          const capabilities = track.getCapabilities ? track.getCapabilities() : {}
+          if (capabilities.torch) {
+            torchTrackRef.current = track
+          }
+        }
+      } catch (e) {
+        // Fallback to screen strobe
+      }
+    } else {
+      showToast("⚡ Beat Flash: OFF (Torch band)")
+      if (torchTrackRef.current) {
+        torchTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+        torchTrackRef.current.stop()
+        torchTrackRef.current = null
+      }
+    }
+  }
+
   // Flash sync effect on beat
   useEffect(() => {
     let interval = null
     if (isFlashSync && isPlaying) {
       interval = setInterval(() => {
         setScreenFlash(true)
-        setTimeout(() => setScreenFlash(false), 90)
+        if (torchTrackRef.current) {
+          torchTrackRef.current.applyConstraints({ advanced: [{ torch: true }] }).catch(() => {})
+        }
+        setTimeout(() => {
+          setScreenFlash(false)
+          if (torchTrackRef.current) {
+            torchTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+          }
+        }, 90)
       }, 480)
     } else {
       setScreenFlash(false)
+      if (torchTrackRef.current) {
+        torchTrackRef.current.applyConstraints({ advanced: [{ torch: false }] }).catch(() => {})
+      }
     }
     return () => clearInterval(interval)
   }, [isFlashSync, isPlaying])
@@ -1289,29 +1332,17 @@ export default function App() {
                   <span className="text-[10px] font-bold">{isInstalled ? 'Installed' : 'Install'}</span>
                 </button>
 
-                {/* Lock Screen Background Play Indicator */}
-                <button
-                  onClick={() => {
-                    showToast("🔒 Lock Screen Play Active: Screen lock hone par bhi gaana chalta rahega! Controls notification bar mein available hain.")
-                  }}
-                  className="flex items-center gap-1 px-2 py-1.5 rounded-full bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/30 transition"
-                  title="Lock Screen & Background Audio Active"
-                >
-                  <Lock size={12} className="text-emerald-400" />
-                  <span className="text-[10px] font-bold">Lock Play</span>
-                </button>
-
                 {/* Search Internet Songs Button */}
                 <button
                   onClick={() => {
                     setSearchSource('online')
                     setCurrentTab('explore')
                   }}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-black/60 border border-[#00F2FE]/50 text-[#00F2FE] hover:bg-[#00F2FE]/20 transition"
-                  title="Search Internet Songs & Play"
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-[#FF0055]/30 to-[#00F2FE]/30 border border-[#00F2FE]/60 text-white hover:bg-white/10 transition shadow-sm"
+                  title="Search Songs"
                 >
-                  <Globe size={12} className="animate-pulse" />
-                  <span className="text-[10px] font-bold">Online</span>
+                  <Search size={13} className="text-[#00F2FE]" />
+                  <span className="text-[11px] font-bold tracking-wide">Search</span>
                 </button>
 
                 {/* Bullet Comments Toggle */}
@@ -1487,9 +1518,9 @@ export default function App() {
                 <span className="text-[10px] font-semibold text-white/90">Quote</span>
               </button>
 
-              {/* Flash Sync Toggle */}
+              {/* Flash Sync Toggle (Back Torch Flashes to Beats) */}
               <button
-                onClick={() => setIsFlashSync(!isFlashSync)}
+                onClick={toggleFlashSyncHandler}
                 className="flex flex-col items-center gap-1 group"
               >
                 <div className={`w-11 h-11 rounded-full backdrop-blur-md flex items-center justify-center border transition active:scale-90 ${
@@ -1531,10 +1562,6 @@ export default function App() {
                         <span>Full Song</span>
                       </span>
                     )}
-                    <span className="px-1.5 py-0.5 rounded bg-sky-500/20 text-sky-300 border border-sky-500/30 text-[9px] font-bold flex-shrink-0 flex items-center gap-0.5" title="Plays on Lock Screen & Background">
-                      <Lock size={8} />
-                      <span>Lock Play</span>
-                    </span>
                   </div>
                   <p className="text-xs text-[#A09EB2] truncate">{currentSong.artist} • {currentSong.album}</p>
                 </div>
@@ -2276,8 +2303,8 @@ export default function App() {
             }}
             className={`flex flex-col items-center gap-1 transition ${currentTab === 'explore' ? 'text-[#FF0055]' : 'text-[#A09EB2]'}`}
           >
-            <Compass size={20} />
-            <span className="text-[10px] font-bold">Search & Vibe</span>
+            <Search size={20} />
+            <span className="text-[10px] font-bold">Search</span>
           </button>
 
           <button

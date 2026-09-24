@@ -1,9 +1,12 @@
 package com.example.ui.player
 
+import android.Manifest
+import android.content.pm.PackageManager
 import android.net.Uri
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.Spring
@@ -44,6 +47,7 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -54,6 +58,7 @@ import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
@@ -95,6 +100,7 @@ import kotlinx.coroutines.launch
 fun VibePlayerScreen(
     viewModel: MusicViewModel,
     onOpenVibeCreator: () -> Unit,
+    onNavigateToSearch: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val currentSong by viewModel.currentSong.collectAsState()
@@ -127,6 +133,26 @@ fun VibePlayerScreen(
             val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "My Track"
             viewModel.addLocalSong(uri, fileName, "Local Artist")
             Toast.makeText(context, "Playing: $fileName", Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    // Camera permission launcher for back flashlight / beat sync
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        if (isGranted) {
+            viewModel.toggleFlashSync()
+            Toast.makeText(
+                context,
+                "⚡ Beat Flash: ON (Song beat par flashlight chalegi)",
+                Toast.LENGTH_SHORT
+            ).show()
+        } else {
+            Toast.makeText(
+                context,
+                "Flashlight (Torch) ke liye Camera permission zaroori hai",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
@@ -260,24 +286,49 @@ fun VibePlayerScreen(
                 )
             }
 
-            // Top Quick Action: Upload Device Song
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .clickable { audioPickerLauncher.launch("audio/*") }
-                    .padding(horizontal = 12.dp, vertical = 6.dp)
-                    .testTag("import_audio_chip")
+            // Top Quick Actions: Search Songs & Upload Device Song
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Icon(
-                        imageVector = Icons.Default.UploadFile,
-                        contentDescription = "Upload MP3",
-                        tint = RessoPrimary,
-                        modifier = Modifier.size(16.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "Play MP3", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable { onNavigateToSearch() }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .testTag("top_search_songs_chip")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "Search",
+                            tint = RessoSecondary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Search", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable { audioPickerLauncher.launch("audio/*") }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .testTag("import_audio_chip")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.UploadFile,
+                            contentDescription = "Upload MP3",
+                            tint = RessoPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Play MP3", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }
@@ -330,19 +381,27 @@ fun VibePlayerScreen(
                 }
             )
 
-            // Flash Sync Toggle Button
+            // Flash Sync Toggle Button (Back Torch Flashes to Song Beats)
             PlayerActionButton(
                 icon = Icons.Default.FlashOn,
                 label = if (isFlashSync) "Flash On" else "Flash",
                 tint = if (isFlashSync) RessoGreen else Color.White.copy(alpha = 0.6f),
                 tag = "player_flash_sync_button",
                 onClick = {
-                    viewModel.toggleFlashSync()
-                    Toast.makeText(
+                    val hasCam = ContextCompat.checkSelfPermission(
                         context,
-                        if (!isFlashSync) "Flash Sync: Enabled (Beats)" else "Flash Sync: Disabled",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                        Manifest.permission.CAMERA
+                    ) == PackageManager.PERMISSION_GRANTED
+                    if (hasCam) {
+                        viewModel.toggleFlashSync()
+                        Toast.makeText(
+                            context,
+                            if (!isFlashSync) "⚡ Beat Flash: ON (Song beat par flashlight chalegi)" else "⚡ Beat Flash: OFF (Torch band)",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    } else {
+                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                    }
                 }
             )
 

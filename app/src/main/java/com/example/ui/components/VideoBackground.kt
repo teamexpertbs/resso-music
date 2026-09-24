@@ -51,7 +51,7 @@ fun VideoBackground(
                         setMediaItem(MediaItem.fromUri(Uri.parse(videoUri)))
                         prepare()
                         playWhenReady = true
-                    } catch (_: Exception) {
+                    } catch (e: Exception) {
                     }
                 }
             }

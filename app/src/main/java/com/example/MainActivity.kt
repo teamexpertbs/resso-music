@@ -36,6 +36,9 @@ import androidx.compose.material.icons.filled.LibraryMusic
 import androidx.compose.material.icons.filled.MusicVideo
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -166,14 +169,14 @@ class MainActivity : ComponentActivity() {
                                         onClick = { currentTab = "explore" },
                                         icon = {
                                             Icon(
-                                                imageVector = Icons.Default.Explore,
-                                                contentDescription = "Explore",
+                                                imageVector = Icons.Default.Search,
+                                                contentDescription = "Search",
                                                 tint = if (currentTab == "explore") RessoPrimary else RessoTextSecondary
                                             )
                                         },
                                         label = {
                                             Text(
-                                                "Explore",
+                                                "Search",
                                                 color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
                                                 fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
                                             )
@@ -181,7 +184,7 @@ class MainActivity : ComponentActivity() {
                                         colors = NavigationBarItemDefaults.colors(
                                             indicatorColor = Color.Transparent
                                         ),
-                                        modifier = Modifier.testTag("nav_item_explore")
+                                        modifier = Modifier.testTag("nav_item_search")
                                     )
 
                                     NavigationBarItem(
@@ -222,7 +225,8 @@ class MainActivity : ComponentActivity() {
                             "foryou" -> {
                                 VibePlayerScreen(
                                     viewModel = musicViewModel,
-                                    onOpenVibeCreator = { currentTab = "vibe_creator" }
+                                    onOpenVibeCreator = { currentTab = "vibe_creator" },
+                                    onNavigateToSearch = { currentTab = "explore" }
                                 )
                             }
                             "explore" -> {
