@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Outer Swirl Arc of Resso vortex ribbon -->
+    <path
+        android:pathData="M38,36 C45,28 62,26 71,34 C80,42 81,58 74,68 C68,76 56,82 44,79 C33,76 27,65 29,54 C30,47 34,42 39,43 C43,44 44,49 43,53 C42,59 46,65 52,66 C58,67 65,63 67,57 C70,51 68,43 63,39 C57,34 46,35 41,40 C38,43 34,41 38,36 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="28"
+                android:startY="28"
+                android:endX="82"
+                android:endY="80"
+                android:type="linear">
+                <item android:color="#FFFF0055" android:offset="0.0" />
+                <item android:color="#FFFF2A6D" android:offset="0.4" />
+                <item android:color="#FF8A2BE2" android:offset="0.8" />
+                <item android:color="#FF00F2FE" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Inner dynamic audio wave loop -->
+    <path
+        android:pathData="M48,46 C52,42 60,42 63,47 C66,51 64,57 60,60 C56,62 50,60 48,56 C46,52 47,48 48,46 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:startX="46"
+                android:startY="44"
+                android:endX="66"
+                android:endY="62"
+                android:type="linear">
+                <item android:color="#FFFF3377" android:offset="0.0" />
+                <item android:color="#FFFF0055" android:offset="1.0" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Center acoustic glow core -->
+    <path
+        android:pathData="M54,52 A3,3 0 1,0 54,58 A3,3 0 1,0 54,52 Z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

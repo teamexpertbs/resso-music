@@ -1,0 +1,81 @@
+name: Build Android APK
+
+on:
+  push:
+    branches: [ "**" ]
+  pull_request:
+    branches: [ "**" ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'gradle'
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+
+      - name: Prepare Android Build Environment
+        run: |
+          echo "Preparing environment..."
+          touch .env
+          touch .env.example
+          # Generate debug.keystore if not present
+          if [ ! -f "debug.keystore" ]; then
+            echo "Creating debug keystore..."
+            keytool -genkey -v -keystore debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          fi
+
+      - name: Build Debug APK
+        run: |
+          gradle :app:assembleDebug --stacktrace --no-daemon
+
+      - name: Find and Rename APK
+        run: |
+          mkdir -p output_apk
+          find app/build/outputs/apk/debug -name "*.apk" -exec cp {} output_apk/Resso-Music.apk \;
+          ls -la output_apk/
+
+      - name: Upload APK as Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Resso-Music-Android-APK
+          path: output_apk/Resso-Music.apk
+          retention-days: 30
+
+      - name: Create GitHub Release (Optional on manual trigger)
+        if: github.event_name == 'workflow_dispatch'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v1.0.${{ github.run_number }}
+          name: "Resso Music Android App v1.0.${{ github.run_number }}"
+          body: |
+            ## 🎵 Resso Music Native Android App
+            - TikTok-style vertical music feed
+            - Video Vibes background sync
+            - ExoPlayer & Media3 Background Playback
+            - Screen-lock persistent audio
+            
+            **Download `Resso-Music.apk` below and install directly on your phone!**
+          files: output_apk/Resso-Music.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

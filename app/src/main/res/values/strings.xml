@@ -1,0 +1,18 @@
+<resources>
+    <string name="app_name">Resso Music</string>
+    <string name="tab_for_you">For You</string>
+    <string name="tab_explore">Explore</string>
+    <string name="tab_library">Library</string>
+    <string name="tab_vibes">Vibes</string>
+    <string name="create_vibe">Create Vibe</string>
+    <string name="vibe_creator_title">Create Song Vibe</string>
+    <string name="select_video">Select Video</string>
+    <string name="trim_video">Trim Video</string>
+    <string name="save_vibe">Save &amp; Apply Vibe</string>
+    <string name="synced_lyrics">Synced Lyrics</string>
+    <string name="comments">Comments</string>
+    <string name="lyric_poster">Lyric Poster</string>
+    <string name="flash_sync">Flash Sync</string>
+    <string name="volume_booster">Volume Booster</string>
+    <string name="liked_songs">Liked Songs</string>
+</resources>
