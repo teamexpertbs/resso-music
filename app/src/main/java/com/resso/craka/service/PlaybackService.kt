@@ -6,9 +6,6 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.media.AudioAttributes
-import android.media.AudioFocusRequest
-import android.media.AudioManager
 import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
@@ -23,14 +20,11 @@ import com.resso.craka.R
 
 class PlaybackService : Service() {
     private var wakeLock: PowerManager.WakeLock? = null
-    private var audioManager: AudioManager? = null
-    private var focusRequest: AudioFocusRequest? = null
     private lateinit var mediaSession: MediaSessionCompat
 
     override fun onCreate() {
         super.onCreate()
         createChannel()
-        audioManager = getSystemService(Context.AUDIO_SERVICE) as AudioManager
         mediaSession = MediaSessionCompat(this, "RessoMusic").apply {
             setCallback(object : MediaSessionCompat.Callback() {
                 override fun onPlay() {
@@ -60,7 +54,7 @@ class PlaybackService : Service() {
             ACTION_NEXT -> commands.onNext?.invoke()
             ACTION_PREV -> commands.onPrevious?.invoke()
             ACTION_STOP -> {
-                releaseAudio()
+                releaseWakeLock()
                 stopForeground(STOP_FOREGROUND_REMOVE)
                 stopSelf()
                 return START_NOT_STICKY
@@ -72,7 +66,7 @@ class PlaybackService : Service() {
                 val notification = buildNotification(title, artist, playing)
                 startForeground(NOTIFICATION_ID, notification)
                 updateSession(title, artist, playing)
-                if (playing) holdAudio() else releaseWakeLock()
+                if (playing) holdWakeLock() else releaseWakeLock()
             }
         }
         return START_STICKY
@@ -81,7 +75,7 @@ class PlaybackService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        releaseAudio()
+        releaseWakeLock()
         stopForeground(STOP_FOREGROUND_REMOVE)
         mediaSession.isActive = false
         mediaSession.release()
@@ -151,7 +145,7 @@ class PlaybackService : Service() {
         )
     }
 
-    private fun holdAudio() {
+    private fun holdWakeLock() {
         if (wakeLock == null) {
             val power = getSystemService(Context.POWER_SERVICE) as PowerManager
             wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Resso:playback").apply {
@@ -161,36 +155,10 @@ class PlaybackService : Service() {
         if (wakeLock?.isHeld != true) {
             wakeLock?.acquire(4 * 60 * 60 * 1000L)
         }
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val request = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setAudioAttributes(
-                    AudioAttributes.Builder()
-                        .setUsage(AudioAttributes.USAGE_MEDIA)
-                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                        .build()
-                )
-                .setOnAudioFocusChangeListener { }
-                .build()
-            focusRequest = request
-            audioManager?.requestAudioFocus(request)
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager?.requestAudioFocus(null, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN)
-        }
     }
 
     private fun releaseWakeLock() {
         if (wakeLock?.isHeld == true) wakeLock?.release()
-    }
-
-    private fun releaseAudio() {
-        releaseWakeLock()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            focusRequest?.let { audioManager?.abandonAudioFocusRequest(it) }
-        } else {
-            @Suppress("DEPRECATION")
-            audioManager?.abandonAudioFocus(null)
-        }
     }
 
     private fun createChannel() {

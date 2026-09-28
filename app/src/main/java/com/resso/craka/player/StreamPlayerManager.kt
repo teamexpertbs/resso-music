@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
@@ -16,7 +17,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 class StreamPlayerManager(private val context: Context) {
-    private var webView: WebView? = null
+    private var webView: KeepAliveWebView? = null
+    private var keepAlivePosted = false
     private val mainHandler = Handler(Looper.getMainLooper())
 
     private var currentVideoId: String? = null
@@ -49,7 +51,7 @@ class StreamPlayerManager(private val context: Context) {
         if (webView != null) return
 
         try {
-            val wv = WebView(context.applicationContext)
+            val wv = KeepAliveWebView(context.applicationContext)
             wv.layoutParams = ViewGroup.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT
@@ -87,13 +89,14 @@ class StreamPlayerManager(private val context: Context) {
         if (webView == null) {
             initWebView()
         }
-        return webView ?: WebView(context.applicationContext).also { webView = it }
+        return webView ?: KeepAliveWebView(context.applicationContext).also { webView = it }
     }
 
     fun loadAndPlay(videoId: String, autoPlay: Boolean = true) {
         currentVideoId = videoId
         _isLoading.value = true
         _currentTimeMs.value = 0L
+        if (autoPlay) setKeepPlayingInBackground(true)
 
         mainHandler.post {
             if (isPlayerReady && webView != null) {
@@ -109,21 +112,58 @@ class StreamPlayerManager(private val context: Context) {
         }
     }
 
+    fun wantsBackgroundPlayback(): Boolean = webView?.holdVisible == true
+
     fun setKeepPlayingInBackground(enabled: Boolean) {
         mainHandler.post {
+            webView?.holdVisible = enabled
             webView?.evaluateJavascript("window.shouldResume = $enabled;", null)
             if (enabled) {
                 webView?.onResume()
                 webView?.resumeTimers()
+                startKeepAlive()
+            } else {
+                stopKeepAlive()
             }
         }
     }
 
     fun stayAwake() {
         mainHandler.post {
+            if (webView?.holdVisible == true) {
+                webView?.onResume()
+                webView?.resumeTimers()
+                nudgePlayback()
+            }
+        }
+    }
+
+    private fun startKeepAlive() {
+        if (keepAlivePosted) return
+        keepAlivePosted = true
+        mainHandler.post(keepAliveRunnable)
+    }
+
+    private fun stopKeepAlive() {
+        keepAlivePosted = false
+        mainHandler.removeCallbacks(keepAliveRunnable)
+    }
+
+    private val keepAliveRunnable = object : Runnable {
+        override fun run() {
+            if (!keepAlivePosted || webView?.holdVisible != true) return
             webView?.onResume()
             webView?.resumeTimers()
+            nudgePlayback()
+            mainHandler.postDelayed(this, 900)
         }
+    }
+
+    private fun nudgePlayback() {
+        webView?.evaluateJavascript(
+            "if (window.shouldResume && player && player.getPlayerState && player.getPlayerState() !== 1 && player.getPlayerState() !== 3) { player.playVideo(); }",
+            null
+        )
     }
 
     fun play() {
@@ -192,8 +232,12 @@ class StreamPlayerManager(private val context: Context) {
                         _isLoading.value = false
                     }
                     2 -> {
-                        _isPlaying.value = false
                         _isLoading.value = false
+                        if (webView?.holdVisible == true) {
+                            nudgePlayback()
+                        } else {
+                            _isPlaying.value = false
+                        }
                     }
                     3 -> {
                         _isLoading.value = true
@@ -223,6 +267,18 @@ class StreamPlayerManager(private val context: Context) {
         fun onError(errorCode: Int) {
             Log.e("YouTubePlayerManager", "YouTube Player Error: $errorCode")
             _isLoading.value = false
+        }
+    }
+
+    private class KeepAliveWebView(context: Context) : WebView(context) {
+        var holdVisible: Boolean = false
+
+        override fun onWindowVisibilityChanged(visibility: Int) {
+            super.onWindowVisibilityChanged(if (holdVisible) View.VISIBLE else visibility)
+        }
+
+        override fun onVisibilityChanged(changedView: View, visibility: Int) {
+            super.onVisibilityChanged(changedView, if (holdVisible) View.VISIBLE else visibility)
         }
     }
 

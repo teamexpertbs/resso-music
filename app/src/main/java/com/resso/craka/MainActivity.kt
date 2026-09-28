@@ -95,9 +95,14 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val musicViewModel: MusicViewModel by viewModels()
 
-    override fun onStop() {
+    override fun onPause() {
+        super.onPause()
         musicViewModel.streamPlayerManager.stayAwake()
+    }
+
+    override fun onStop() {
         super.onStop()
+        musicViewModel.streamPlayerManager.stayAwake()
     }
 
     @OptIn(ExperimentalMaterial3Api::class)
@@ -263,9 +268,6 @@ class MainActivity : ComponentActivity() {
                         containerColor = RessoBackground,
                         modifier = Modifier.fillMaxSize()
                     ) { innerPadding ->
-                        val isVideoMode by musicViewModel.isVideoMode.collectAsState()
-                        val isOnlineVideoActive = (currentTab == "foryou" && isVideoMode && currentSong?.id?.startsWith("yt_") == true)
-
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -278,9 +280,7 @@ class MainActivity : ComponentActivity() {
                                     (wv.parent as? ViewGroup)?.removeView(wv)
                                     wv
                                 },
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .alpha(if (isOnlineVideoActive) 1f else 0.02f)
+                                modifier = Modifier.fillMaxSize()
                             )
 
                             when (currentTab) {

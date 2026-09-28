@@ -251,8 +251,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             streamPlayerManager.isPlaying.collect { streamPlaying ->
                 val song = _currentSong.value
                 if (song != null && song.id.startsWith("yt_")) {
-                    _isPlaying.value = streamPlaying
-                    publishPlayback(streamPlaying)
+                    if (streamPlaying || !streamPlayerManager.wantsBackgroundPlayback()) {
+                        _isPlaying.value = streamPlaying
+                        publishPlayback(streamPlaying)
+                    }
                     if (streamPlaying && _isFlashSyncEnabled.value) {
                         flashSyncManager.startSync(128)
                     } else if (!streamPlaying && !player.isPlaying) {
@@ -546,7 +548,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun publishPlayback(playing: Boolean = _isPlaying.value) {
         val song = _currentSong.value ?: return
-        streamPlayerManager.setKeepPlayingInBackground(playing && song.id.startsWith("yt_"))
+        if (playing && song.id.startsWith("yt_")) {
+            streamPlayerManager.setKeepPlayingInBackground(true)
+        }
         PlaybackService.update(
             context = getApplication(),
             title = song.title,
@@ -572,6 +576,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val song = _currentSong.value ?: return
         if (!_isPlaying.value) return
         if (song.id.startsWith("yt_")) {
+            streamPlayerManager.setKeepPlayingInBackground(false)
             streamPlayerManager.pause()
         } else {
             player.pause()
