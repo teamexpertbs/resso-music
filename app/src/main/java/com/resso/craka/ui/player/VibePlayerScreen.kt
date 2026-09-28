@@ -34,6 +34,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -370,7 +371,8 @@ fun VibePlayerScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(top = 48.dp, start = 16.dp, end = 16.dp),
+                .statusBarsPadding()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -409,83 +411,36 @@ fun VibePlayerScreen(
                 }
             }
 
-            // Top Quick Actions: Watch MV, Search Songs & Upload Device Song
+            // Compact controls keep the header usable on narrow Android screens.
             Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 if (currentSong?.id?.startsWith("yt_") == true) {
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(20.dp))
-                            .background(if (isVideoMode) Color(0xFFE91E63) else Color.Black.copy(alpha = 0.5f))
-                            .clickable { viewModel.toggleVideoMode() }
-                            .padding(horizontal = 10.dp, vertical = 6.dp)
-                            .testTag("toggle_mv_mode_button")
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.MusicVideo,
-                                contentDescription = "Toggle Video",
-                                tint = Color.White,
-                                modifier = Modifier.size(15.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                             text = if (isVideoMode) "MV" else "Video",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
+                    PlayerTopActionButton(
+                        icon = Icons.Default.MusicVideo,
+                        contentDescription = if (isVideoMode) "Hide music video" else "Show music video",
+                        selected = isVideoMode,
+                        tag = "toggle_mv_mode_button",
+                        onClick = { viewModel.toggleVideoMode() }
+                    )
                 }
 
-                // Quick Lyrics toggle chip
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(if (isLyricsVisible) RessoPrimary else Color.Black.copy(alpha = 0.5f))
-                        .clickable { viewModel.toggleLyrics() }
-                        .padding(horizontal = 10.dp, vertical = 6.dp)
-                        .testTag("toggle_lyrics_chip")
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.FormatQuote,
-                            contentDescription = "Toggle Lyrics",
-                            tint = Color.White,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                             text = "Lyrics",
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(Color.Black.copy(alpha = 0.5f))
-                        .clickable { onNavigateToSearch() }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .testTag("top_search_songs_chip")
-                ) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.Search,
-                            contentDescription = "Search",
-                            tint = RessoSecondary,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(text = "Search", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    }
-                }
+                PlayerTopActionButton(
+                    icon = Icons.Default.FormatQuote,
+                    contentDescription = if (isLyricsVisible) "Hide lyrics" else "Show lyrics",
+                    selected = isLyricsVisible,
+                    tag = "toggle_lyrics_chip",
+                    onClick = { viewModel.toggleLyrics() }
+                )
+                PlayerTopActionButton(
+                    icon = Icons.Default.Search,
+                    contentDescription = "Search songs",
+                    selected = false,
+                    tint = RessoSecondary,
+                    tag = "top_search_songs_chip",
+                    onClick = onNavigateToSearch
+                )
             }
         }
 
@@ -627,12 +582,6 @@ fun VibePlayerScreen(
                     }
                 }
 
-                // Swipe hints
-                Text(
-                    text = "Swipe to switch",
-                    fontSize = 10.sp,
-                    color = RessoTextSecondary.copy(alpha = 0.7f)
-                )
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -793,6 +742,32 @@ fun PlayerActionButton(
             fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = Color.White
+        )
+    }
+}
+
+@Composable
+private fun PlayerTopActionButton(
+    icon: ImageVector,
+    contentDescription: String,
+    selected: Boolean,
+    tag: String,
+    onClick: () -> Unit,
+    tint: Color = Color.White
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = Modifier
+            .size(38.dp)
+            .clip(CircleShape)
+            .background(if (selected) RessoPrimary else Color.Black.copy(alpha = 0.42f))
+            .testTag(tag)
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = contentDescription,
+            tint = tint,
+            modifier = Modifier.size(18.dp)
         )
     }
 }
