@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -41,11 +42,11 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Tab
-import androidx.compose.material3.TabRow
 import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -95,13 +96,14 @@ fun LibraryScreen(
     var isNewPlaylistDialogOpen by remember { mutableStateOf(false) }
     var newPlaylistTitle by remember { mutableStateOf("") }
 
-    val tabTitles = listOf("Liked (${likedSongs.size})", "Created Vibes (${allVibes.size})", "Playlists", "Uploads")
+    val tabTitles = listOf("Liked", "Vibes", "Playlists", "Uploads")
 
     Column(
         modifier = modifier
             .fillMaxSize()
             .background(RessoBackground)
-            .padding(16.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .testTag("library_screen")
     ) {
         Row(
@@ -128,13 +130,13 @@ fun LibraryScreen(
 
                 Column {
                     Text(
-                        text = "My Library",
+                        text = "Library",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "Your music, saved vibes & playlists",
+                        text = "Your saved music and playlists",
                         style = MaterialTheme.typography.bodySmall,
                         color = RessoTextSecondary
                     )
@@ -159,10 +161,11 @@ fun LibraryScreen(
         Spacer(modifier = Modifier.height(14.dp))
 
         // Tab Row
-        TabRow(
+        ScrollableTabRow(
             selectedTabIndex = selectedTabIndex,
             containerColor = Color.Transparent,
             contentColor = RessoPrimary,
+            edgePadding = 0.dp,
             indicator = { tabPositions ->
                 TabRowDefaults.SecondaryIndicator(
                     modifier = Modifier.tabIndicatorOffset(tabPositions[selectedTabIndex]),

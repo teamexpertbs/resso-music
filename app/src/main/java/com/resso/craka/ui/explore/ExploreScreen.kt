@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -137,7 +138,8 @@ fun ExploreScreen(
         modifier = modifier
             .fillMaxSize()
             .background(RessoBackground)
-            .padding(16.dp)
+            .statusBarsPadding()
+            .padding(horizontal = 16.dp, vertical = 10.dp)
             .testTag("explore_screen")
     ) {
         // Header with Sidebar opener
@@ -154,7 +156,7 @@ fun ExploreScreen(
                     color = Color.White
                 )
                 Text(
-                    text = "Cloud Music • Search & stream any song in full length",
+                    text = "Find the next song you love",
                     style = MaterialTheme.typography.bodySmall,
                     color = RessoTextSecondary
                 )
@@ -300,7 +302,7 @@ fun ExploreScreen(
             val titleText = if (searchKeyword.isNotBlank()) {
                 "Results for \"$searchKeyword\" (${displaySongs.size})"
             } else {
-                "Trending Songs (${displaySongs.size})"
+                "Trending (${displaySongs.size})"
             }
             Text(
                 text = titleText,
