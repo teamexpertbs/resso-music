@@ -2,6 +2,7 @@ package com.example.ui.viewmodel
 
 import android.app.Application
 import android.net.Uri
+import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.media3.common.MediaItem
@@ -14,6 +15,7 @@ import com.example.data.model.PlaylistEntity
 import com.example.data.model.SongEntity
 import com.example.data.model.VibeEntity
 import com.example.flash.FlashSyncManager
+import com.example.player.YouTubePlayerManager
 import com.example.util.LyricsParser
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -21,7 +23,6 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -29,6 +30,7 @@ import kotlinx.coroutines.launch
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as RessoApplication).repository
     val flashSyncManager = FlashSyncManager(application)
+    val youtubePlayerManager = YouTubePlayerManager(application)
 
     private val player: ExoPlayer = ExoPlayer.Builder(application).build()
 
@@ -121,6 +123,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         setupPlayerListener()
+        setupYouTubeListener()
         startProgressTracking()
         loadTrendingSongs()
 
@@ -133,14 +136,76 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun setupYouTubeListener() {
+        youtubePlayerManager.onVideoEnded = {
+            handleSongEnded()
+        }
+
+        viewModelScope.launch {
+            youtubePlayerManager.isPlaying.collect { ytPlaying ->
+                val song = _currentSong.value
+                if (song != null && song.id.startsWith("yt_")) {
+                    _isPlaying.value = ytPlaying
+                    if (ytPlaying && _isFlashSyncEnabled.value) {
+                        flashSyncManager.startSync(128)
+                    } else if (!ytPlaying && !player.isPlaying) {
+                        flashSyncManager.stopSync()
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            youtubePlayerManager.currentTimeMs.collect { ytPos ->
+                val song = _currentSong.value
+                if (song != null && song.id.startsWith("yt_")) {
+                    _currentPositionMs.value = ytPos
+                    val currentLyrics = _lyrics.value
+                    if (currentLyrics.isNotEmpty()) {
+                        val idx = currentLyrics.indexOfLast { it.timeMs <= ytPos }
+                        _activeLyricIndex.value = if (idx >= 0) idx else 0
+                    }
+                }
+            }
+        }
+
+        viewModelScope.launch {
+            youtubePlayerManager.durationMs.collect { ytDur ->
+                val song = _currentSong.value
+                if (song != null && song.id.startsWith("yt_") && ytDur > 1000L) {
+                    _durationMs.value = ytDur
+                }
+            }
+        }
+    }
+
+    private fun handleSongEnded() {
+        when (_repeatMode.value) {
+            2 -> {
+                seekTo(0)
+                togglePlayPause()
+            }
+            1 -> playNextSong()
+            else -> {
+                val songs = allSongs.value
+                if (_currentSongIndex.value < songs.size - 1) {
+                    playNextSong()
+                } else {
+                    _isPlaying.value = false
+                }
+            }
+        }
+    }
+
     private fun loadTrendingSongs() {
         viewModelScope.launch {
             try {
-                val trending = repository.searchSongsOnline("Bollywood hits")
+                val trending = repository.getTrendingSongs()
                 if (trending.isNotEmpty()) {
                     _trendingSongs.value = trending
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                Log.w("MusicViewModel", "Error loading trending: ${e.message}")
             }
         }
     }
@@ -162,7 +227,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 // 1. Gather matching local songs
                 val localMatches = repository.searchLocalSongs(trimmed)
 
-                // 2. Search online songs from iTunes catalog
+                // 2. Search YouTube / Online songs (with full-length YouTube audio)
                 val onlineMatches = repository.searchSongsOnline(trimmed)
 
                 // 3. Combine without duplicate entries
@@ -246,31 +311,24 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun setupPlayerListener() {
         player.addListener(object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
-                _isPlaying.value = playing
-                if (playing && _isFlashSyncEnabled.value) {
-                    flashSyncManager.startSync(128)
-                } else {
-                    flashSyncManager.stopSync()
+                val song = _currentSong.value
+                if (song != null && !song.id.startsWith("yt_")) {
+                    _isPlaying.value = playing
+                    if (playing && _isFlashSyncEnabled.value) {
+                        flashSyncManager.startSync(128)
+                    } else if (!playing && !youtubePlayerManager.isPlaying.value) {
+                        flashSyncManager.stopSync()
+                    }
                 }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
-                if (state == Player.STATE_READY) {
-                    _durationMs.value = player.duration.coerceAtLeast(1L)
-                } else if (state == Player.STATE_ENDED) {
-                    when (_repeatMode.value) {
-                        2 -> {
-                            player.seekTo(0)
-                            player.play()
-                        }
-                        1 -> playNextSong()
-                        else -> {
-                            if (_currentSongIndex.value < allSongs.value.size - 1) {
-                                playNextSong()
-                            } else {
-                                _isPlaying.value = false
-                            }
-                        }
+                val song = _currentSong.value
+                if (song != null && !song.id.startsWith("yt_")) {
+                    if (state == Player.STATE_READY) {
+                        _durationMs.value = player.duration.coerceAtLeast(1L)
+                    } else if (state == Player.STATE_ENDED) {
+                        handleSongEnded()
                     }
                 }
             }
@@ -281,7 +339,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         progressJob?.cancel()
         progressJob = viewModelScope.launch {
             while (isActive) {
-                if (player.isPlaying) {
+                val song = _currentSong.value
+                if (song != null && !song.id.startsWith("yt_") && player.isPlaying) {
                     val pos = player.currentPosition
                     _currentPositionMs.value = pos
                     val dur = player.duration
@@ -305,21 +364,40 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _lyrics.value = LyricsParser.parse(song.lyricsLrc)
         _currentVibeUri.value = song.vibeVideoUri
         _activeLyricIndex.value = 0
+        _currentPositionMs.value = 0L
+        _durationMs.value = song.durationMs.coerceAtLeast(1000L)
 
         // Observe comments for this song
         observeCommentsForSong(song.id)
 
-        try {
-            val mediaItem = MediaItem.fromUri(Uri.parse(song.audioUrl))
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            if (autoPlay) {
-                player.play()
-                _isPlaying.value = true
-            } else {
-                _isPlaying.value = false
+        if (song.id.startsWith("yt_")) {
+            // YouTube Song: pause ExoPlayer, play via YouTube Manager in full length
+            if (player.isPlaying) {
+                player.stop()
             }
-        } catch (_: Exception) {
+            val videoId = song.id.removePrefix("yt_")
+            youtubePlayerManager.loadAndPlay(videoId, autoPlay)
+            _isPlaying.value = autoPlay
+        } else {
+            // Standard media: pause YouTube, play via ExoPlayer
+            youtubePlayerManager.pause()
+            try {
+                val mediaItem = MediaItem.fromUri(Uri.parse(song.audioUrl))
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                if (autoPlay) {
+                    player.play()
+                    _isPlaying.value = true
+                } else {
+                    _isPlaying.value = false
+                }
+            } catch (e: Exception) {
+                Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
+            }
+        }
+
+        if (song.lyricsLrc.isBlank()) {
+            fetchAndApplyLyrics(song)
         }
     }
 
@@ -333,10 +411,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun togglePlayPause() {
-        if (player.isPlaying) {
-            player.pause()
+        val song = _currentSong.value ?: return
+        if (song.id.startsWith("yt_")) {
+            youtubePlayerManager.togglePlayPause()
         } else {
-            player.play()
+            if (player.isPlaying) {
+                player.pause()
+            } else {
+                player.play()
+            }
         }
     }
 
@@ -363,8 +446,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun seekTo(positionMs: Long) {
-        player.seekTo(positionMs)
         _currentPositionMs.value = positionMs
+        val song = _currentSong.value
+        if (song != null && song.id.startsWith("yt_")) {
+            youtubePlayerManager.seekTo(positionMs)
+        } else {
+            player.seekTo(positionMs)
+        }
     }
 
     fun toggleShuffle() {
@@ -533,5 +621,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         commentsJob?.cancel()
         flashSyncManager.stopSync()
         player.release()
+        youtubePlayerManager.release()
     }
 }

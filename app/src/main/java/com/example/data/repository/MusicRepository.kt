@@ -41,6 +41,7 @@ class MusicRepository(context: Context) {
 
     // Online & Local Search
     suspend fun searchSongsOnline(query: String): List<SongEntity> = searchService.searchSongs(query)
+    suspend fun getTrendingSongs(): List<SongEntity> = searchService.getTrendingSongs()
     suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
     suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
     suspend fun updateSongLyrics(songId: String, lyrics: String) = songDao.updateSongLyrics(songId, lyrics)

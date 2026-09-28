@@ -3,9 +3,11 @@ package com.example.ui.player
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
+import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -44,6 +46,7 @@ import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.Menu
+import androidx.compose.material.icons.filled.MusicVideo
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
@@ -53,6 +56,7 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -126,6 +130,7 @@ fun VibePlayerScreen(
     // Double tap heart animation
     var showBigHeart by remember { mutableStateOf(false) }
     val heartScale = remember { Animatable(0f) }
+    var showYouTubeVideo by remember { mutableStateOf(false) }
 
     // Audio file picker launcher
     val audioPickerLauncher = rememberLauncherForActivityResult(
@@ -204,12 +209,28 @@ fun VibePlayerScreen(
             }
             .testTag("vibe_player_screen")
     ) {
-        // 1. Dynamic Video / Ambient Vibe Background
-        VideoBackground(
-            videoUri = currentVibeUri,
-            filterType = currentVibeFilter,
-            isPlaying = isPlaying
-        )
+        // 1. Dynamic Video / Ambient Vibe Background or YouTube Official MV
+        if (showYouTubeVideo && currentSong?.id?.startsWith("yt_") == true) {
+            AndroidView(
+                factory = { ctx ->
+                    val wv = viewModel.youtubePlayerManager.getWebView()
+                    (wv.parent as? ViewGroup)?.removeView(wv)
+                    wv
+                },
+                modifier = Modifier.fillMaxSize()
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(Color.Black.copy(alpha = 0.35f))
+            )
+        } else {
+            VideoBackground(
+                videoUri = currentVibeUri,
+                filterType = currentVibeFilter,
+                isPlaying = isPlaying
+            )
+        }
 
         // 2. Synced Scrolling Lyrics Layer
         if (lyrics.isNotEmpty()) {
@@ -308,11 +329,38 @@ fun VibePlayerScreen(
                 }
             }
 
-            // Top Quick Actions: Search Songs
+            // Top Quick Actions: Watch MV, Search Songs & Upload Device Song
             Row(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                if (currentSong?.id?.startsWith("yt_") == true) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(20.dp))
+                            .background(if (showYouTubeVideo) Color(0xFFCC0000) else Color.Black.copy(alpha = 0.5f))
+                            .clickable { showYouTubeVideo = !showYouTubeVideo }
+                            .padding(horizontal = 10.dp, vertical = 6.dp)
+                            .testTag("toggle_mv_mode_button")
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(
+                                imageVector = Icons.Default.MusicVideo,
+                                contentDescription = "Toggle Video",
+                                tint = Color.White,
+                                modifier = Modifier.size(15.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text(
+                                text = if (showYouTubeVideo) "MV ON" else "Watch MV",
+                                color = Color.White,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))
@@ -330,6 +378,26 @@ fun VibePlayerScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(text = "Search", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color.Black.copy(alpha = 0.5f))
+                        .clickable { audioPickerLauncher.launch("audio/*") }
+                        .padding(horizontal = 12.dp, vertical = 6.dp)
+                        .testTag("import_audio_chip")
+                ) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = Icons.Default.UploadFile,
+                            contentDescription = "Upload MP3",
+                            tint = RessoPrimary,
+                            modifier = Modifier.size(16.dp)
+                        )
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text(text = "Play MP3", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
                     }
                 }
             }
@@ -419,12 +487,24 @@ fun VibePlayerScreen(
                         color = Color.White,
                         maxLines = 1
                     )
-                    Text(
-                        text = currentSong?.artist ?: "Resso Artist",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = RessoTextSecondary,
-                        maxLines = 1
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = currentSong?.artist ?: "Resso Artist",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = RessoTextSecondary,
+                            maxLines = 1,
+                            modifier = Modifier.weight(1f, fill = false)
+                        )
+                        if (currentSong?.id?.startsWith("yt_") == true) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "• YouTube Full Song",
+                                color = Color(0xFFFF4D4D),
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
 
                 // Swipe hints

@@ -154,7 +154,7 @@ fun ExploreScreen(
                     color = Color.White
                 )
                 Text(
-                    text = "Millions of online songs, Bollywood, Punjabi & global vibes",
+                    text = "YouTube Data API powered • Search & stream any song in full length",
                     style = MaterialTheme.typography.bodySmall,
                     color = RessoTextSecondary
                 )
@@ -182,7 +182,7 @@ fun ExploreScreen(
         OutlinedTextField(
             value = searchKeyword,
             onValueChange = { searchKeyword = it },
-            placeholder = { Text("Search songs, artists (e.g. Arijit, Sidhu)...", color = RessoTextSecondary, fontSize = 13.sp) },
+            placeholder = { Text("Search any song on YouTube (e.g. Arijit, Sidhu, Coke Studio)...", color = RessoTextSecondary, fontSize = 13.sp) },
             leadingIcon = {
                 Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = RessoPrimary)
             },
@@ -498,7 +498,30 @@ fun SongListItem(
                     )
                 }
 
-                if (isOnline || song.id.startsWith("online_")) {
+                if (song.id.startsWith("yt_")) {
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFCC0000).copy(alpha = 0.2f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.PlayArrow,
+                            contentDescription = null,
+                            tint = Color(0xFFFF3333),
+                            modifier = Modifier.size(12.dp)
+                        )
+                        Spacer(modifier = Modifier.width(3.dp))
+                        Text(
+                            text = "YouTube • Full Song",
+                            color = Color(0xFFFF4D4D),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else if (isOnline || song.id.startsWith("online_")) {
                     Spacer(modifier = Modifier.height(3.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(
