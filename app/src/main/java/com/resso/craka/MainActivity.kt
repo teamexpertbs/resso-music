@@ -95,6 +95,11 @@ import kotlinx.coroutines.launch
 class MainActivity : ComponentActivity() {
     private val musicViewModel: MusicViewModel by viewModels()
 
+    override fun onStop() {
+        musicViewModel.streamPlayerManager.stayAwake()
+        super.onStop()
+    }
+
     @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

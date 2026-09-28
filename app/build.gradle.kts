@@ -1,4 +1,5 @@
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
+import java.util.Properties
 
 plugins {
   alias(libs.plugins.android.application)
@@ -21,13 +22,22 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
+    val localProperties = Properties()
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+      localPropertiesFile.inputStream().use { localProperties.load(it) }
+    }
     fun secretField(name: String): String {
-      return providers.gradleProperty(name)
-        .orElse(providers.environmentVariable(name))
-        .orElse("")
-        .get()
-        .replace("\\", "\\\\")
-        .replace("\"", "\\\"")
+      val fromLocal = localProperties.getProperty(name)?.trim().orEmpty()
+      val raw = if (fromLocal.isNotEmpty()) {
+        fromLocal
+      } else {
+        providers.gradleProperty(name)
+          .orElse(providers.environmentVariable(name))
+          .orElse("")
+          .get()
+      }
+      return raw.replace("\\", "\\\\").replace("\"", "\\\"")
     }
     buildConfigField("String", "YOUTUBE_API_KEY", "\"${secretField("YOUTUBE_API_KEY")}\"")
     buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${secretField("SPOTIFY_CLIENT_ID")}\"")
@@ -113,6 +123,7 @@ dependencies {
   implementation(libs.androidx.media3.exoplayer)
   implementation(libs.androidx.media3.session)
   implementation(libs.androidx.media3.ui)
+  implementation("androidx.media:media:1.7.0")
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
   // Uncomment to use Firestore:

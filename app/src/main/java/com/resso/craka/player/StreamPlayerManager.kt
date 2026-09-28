@@ -109,15 +109,34 @@ class StreamPlayerManager(private val context: Context) {
         }
     }
 
+    fun setKeepPlayingInBackground(enabled: Boolean) {
+        mainHandler.post {
+            webView?.evaluateJavascript("window.shouldResume = $enabled;", null)
+            if (enabled) {
+                webView?.onResume()
+                webView?.resumeTimers()
+            }
+        }
+    }
+
+    fun stayAwake() {
+        mainHandler.post {
+            webView?.onResume()
+            webView?.resumeTimers()
+        }
+    }
+
     fun play() {
         mainHandler.post {
-            webView?.evaluateJavascript("if (player && player.playVideo) { player.playVideo(); }", null)
+            webView?.onResume()
+            webView?.resumeTimers()
+            webView?.evaluateJavascript("window.shouldResume = true; if (player && player.playVideo) { player.playVideo(); }", null)
         }
     }
 
     fun pause() {
         mainHandler.post {
-            webView?.evaluateJavascript("if (player && player.pauseVideo) { player.pauseVideo(); }", null)
+            webView?.evaluateJavascript("window.shouldResume = false; if (player && player.pauseVideo) { player.pauseVideo(); }", null)
         }
     }
 
@@ -282,6 +301,17 @@ class StreamPlayerManager(private val context: Context) {
                             window.AndroidBridge.onError(event.data);
                         }
                     }
+
+                    try {
+                        Object.defineProperty(document, 'hidden', { configurable: true, get: function() { return false; } });
+                        Object.defineProperty(document, 'visibilityState', { configurable: true, get: function() { return 'visible'; } });
+                    } catch (e) {}
+                    window.shouldResume = false;
+                    document.addEventListener('visibilitychange', function() {
+                        if (window.shouldResume && player && player.playVideo) {
+                            player.playVideo();
+                        }
+                    });
 
                     setInterval(function() {
                         if (player && isReady && player.getCurrentTime) {

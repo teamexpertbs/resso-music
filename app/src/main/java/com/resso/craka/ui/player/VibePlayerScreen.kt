@@ -91,6 +91,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -327,7 +328,10 @@ fun VibePlayerScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
+            Row(
+                modifier = Modifier.weight(1f),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
                 IconButton(
                     onClick = onOpenSidebar,
                     modifier = Modifier
@@ -346,18 +350,21 @@ fun VibePlayerScreen(
 
                 Spacer(modifier = Modifier.width(10.dp))
 
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                      Text(
                          text = "resso",
                          fontSize = 20.sp,
                          fontWeight = FontWeight.ExtraBold,
                          color = Color.White,
-                         letterSpacing = (-0.4).sp
+                         letterSpacing = (-0.4).sp,
+                         maxLines = 1
                      )
                     Text(
                          text = "${currentSong?.mood ?: "Chill"} · ${currentSong?.genre ?: "Pop"}",
                         fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.7f)
+                        color = Color.White.copy(alpha = 0.7f),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -399,7 +406,7 @@ fun VibePlayerScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 12.dp, bottom = 116.dp),
+                .padding(end = 8.dp, bottom = 196.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -475,7 +482,7 @@ fun VibePlayerScreen(
                         )
                     )
                 )
-                .padding(horizontal = 18.dp, vertical = 10.dp)
+                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
         ) {
             // Track Info & Artist
             Row(
@@ -489,7 +496,8 @@ fun VibePlayerScreen(
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,
-                        maxLines = 1
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
@@ -497,6 +505,7 @@ fun VibePlayerScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = RessoTextSecondary,
                             maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f, fill = false)
                         )
                         if (currentSong?.id?.startsWith("yt_") == true) {
@@ -541,7 +550,7 @@ fun VibePlayerScreen(
                 ),
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(24.dp)
+                    .height(32.dp)
                     .testTag("playback_progress_slider")
             )
 
@@ -595,7 +604,7 @@ fun VibePlayerScreen(
                 // Play / Pause FAB
                 Box(
                     modifier = Modifier
-                        .size(56.dp)
+                        .size(48.dp)
                         .clip(CircleShape)
                         .background(RessoPrimary)
                         .clickable { viewModel.togglePlayPause() }

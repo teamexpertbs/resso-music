@@ -10,9 +10,12 @@ import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.resso.craka.service.PlaybackService
 import com.resso.craka.RessoApplication
 import com.resso.craka.data.model.CommentEntity
 import com.resso.craka.data.model.LyricLine
@@ -37,7 +40,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val flashSyncManager = FlashSyncManager(application)
     val streamPlayerManager = StreamPlayerManager(application)
 
-    private val player: ExoPlayer = ExoPlayer.Builder(application).build()
+    private val player: ExoPlayer = ExoPlayer.Builder(application)
+        .setAudioAttributes(
+            AudioAttributes.Builder()
+                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                .setUsage(C.USAGE_MEDIA)
+                .build(),
+            true
+        )
+        .setHandleAudioBecomingNoisy(true)
+        .setWakeMode(C.WAKE_MODE_NETWORK)
+        .build()
 
     val allSongs: StateFlow<List<SongEntity>> = repository.getAllSongs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -165,6 +178,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     init {
+        PlaybackService.commands.onPlay = { resumePlayback() }
+        PlaybackService.commands.onPause = { pausePlayback() }
+        PlaybackService.commands.onNext = { playNextSong() }
+        PlaybackService.commands.onPrevious = { playPreviousSong() }
         setupPlayerListener()
         setupStreamListener()
         startProgressTracking()
@@ -235,6 +252,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 val song = _currentSong.value
                 if (song != null && song.id.startsWith("yt_")) {
                     _isPlaying.value = streamPlaying
+                    publishPlayback(streamPlaying)
                     if (streamPlaying && _isFlashSyncEnabled.value) {
                         flashSyncManager.startSync(128)
                     } else if (!streamPlaying && !player.isPlaying) {
@@ -523,6 +541,43 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (song.lyricsLrc.isBlank()) {
             fetchAndApplyLyrics(song)
         }
+        publishPlayback(autoPlay)
+    }
+
+    private fun publishPlayback(playing: Boolean = _isPlaying.value) {
+        val song = _currentSong.value ?: return
+        streamPlayerManager.setKeepPlayingInBackground(playing && song.id.startsWith("yt_"))
+        PlaybackService.update(
+            context = getApplication(),
+            title = song.title,
+            artist = song.artist,
+            playing = playing
+        )
+    }
+
+    private fun resumePlayback() {
+        val song = _currentSong.value ?: return
+        if (_isPlaying.value) return
+        if (song.id.startsWith("yt_")) {
+            streamPlayerManager.play()
+            _isPlaying.value = true
+        } else {
+            player.play()
+            _isPlaying.value = true
+        }
+        publishPlayback(true)
+    }
+
+    private fun pausePlayback() {
+        val song = _currentSong.value ?: return
+        if (!_isPlaying.value) return
+        if (song.id.startsWith("yt_")) {
+            streamPlayerManager.pause()
+        } else {
+            player.pause()
+        }
+        _isPlaying.value = false
+        publishPlayback(false)
     }
 
     private fun observeCommentsForSong(songId: String) {
@@ -538,13 +593,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val song = _currentSong.value ?: return
         if (song.id.startsWith("yt_")) {
             streamPlayerManager.togglePlayPause()
+            return
+        } else if (player.isPlaying) {
+            player.pause()
+            _isPlaying.value = false
         } else {
-            if (player.isPlaying) {
-                player.pause()
-            } else {
-                player.play()
-            }
+            player.play()
+            _isPlaying.value = true
         }
+        publishPlayback(_isPlaying.value)
     }
 
     fun playNextSong() {
@@ -757,5 +814,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         flashSyncManager.stopSync()
         player.release()
         streamPlayerManager.release()
+        PlaybackService.commands.onPlay = null
+        PlaybackService.commands.onPause = null
+        PlaybackService.commands.onNext = null
+        PlaybackService.commands.onPrevious = null
+        PlaybackService.stop(getApplication())
     }
 }

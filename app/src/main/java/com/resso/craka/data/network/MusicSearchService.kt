@@ -56,6 +56,8 @@ class MusicSearchService {
                     "&maxResults=$limit" +
                     "&q=$encoded" +
                     "&type=video" +
+                    "&videoEmbeddable=true" +
+                    "&videoSyndicated=true" +
                     "&key=$youtubeApiKey"
 
             val request = Request.Builder()
@@ -101,7 +103,7 @@ class MusicSearchService {
             // Fetch video durations in single batch query
             val durationsMap = fetchVideoDurations(videoIds)
 
-            rawSongs.map { raw ->
+            val songs = rawSongs.map { raw ->
                 val durationMs = durationsMap[raw.videoId] ?: 210000L
                 val cleanTitle = cleanYouTubeTitle(decodeHtmlEntities(raw.title))
                 val cleanArtist = decodeHtmlEntities(raw.channelTitle)
@@ -122,6 +124,8 @@ class MusicSearchService {
                     isCustomUpload = false
                 )
             }
+            val fullSongs = songs.filter { it.durationMs in 75_000L..900_000L }
+            if (fullSongs.isNotEmpty()) fullSongs else songs
         } catch (e: Exception) {
             Log.e(TAG, "YouTube API error: ${e.message}", e)
             emptyList()
@@ -304,16 +308,14 @@ class MusicSearchService {
                         artist = track.artist,
                         album = track.album,
                         albumArtUrl = track.albumArtUrl.ifBlank { match.albumArtUrl },
-                        durationMs = track.durationMs.takeIf { it > 0L } ?: match.durationMs,
+                        durationMs = match.durationMs,
                         mood = track.mood
                     )
                 )
-            } else if (track.audioUrl.isNotBlank()) {
-                merged.add(track)
             }
         }
         merged.addAll(youtube.filter { it.id !in usedYoutube })
-        return merged
+        return if (merged.isNotEmpty()) merged else youtube
     }
 
     private fun titlesMatch(left: String, right: String): Boolean {
