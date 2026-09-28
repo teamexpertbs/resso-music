@@ -35,8 +35,76 @@
   }
 }
 
+@keyframes rotateDisc {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 15px rgba(255, 42, 109, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 30px rgba(5, 217, 232, 0.6);
+  }
+}
+
+.rotate-disc {
+  animation: rotateDisc 16s linear infinite;
+}
+
+.paused {
+  animation-play-state: paused !important;
+}
+
 .animate-float-up {
   animation: floatUp 2s ease-out forwards;
+}
+
+@keyframes danmaku {
+  0% {
+    transform: translateX(120%);
+    opacity: 0;
+  }
+  10% {
+    opacity: 0.95;
+  }
+  90% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: translateX(-160%);
+    opacity: 0;
+  }
+}
+
+.animate-danmaku-1 {
+  animation: danmaku 8s linear infinite;
+}
+
+.animate-danmaku-2 {
+  animation: danmaku 11s linear infinite 2.5s;
+}
+
+.animate-danmaku-3 {
+  animation: danmaku 9.5s linear infinite 5s;
+}
+
+@keyframes flashBeat {
+  0%, 100% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0.28;
+  }
+}
+
+.animate-flash-beat {
+  animation: flashBeat 0.46s ease-in-out infinite;
 }
 
 .no-scrollbar::-webkit-scrollbar {
