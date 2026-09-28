@@ -1,6 +1,7 @@
 package com.resso.craka.data.network
 
 import android.util.Log
+import com.resso.craka.BuildConfig
 import com.resso.craka.data.model.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -17,8 +18,10 @@ class MusicSearchService {
         .build()
 
     companion object {
-        const val YOUTUBE_API_KEY = "AIzaSyAjVymdjvlkvZkP6gdkTjByGMiw-CMzjhY"
+        private const val TAG = "MusicSearchService"
     }
+
+    private val youtubeApiKey = BuildConfig.YOUTUBE_API_KEY.trim()
 
     suspend fun searchSongs(query: String, limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
@@ -44,6 +47,11 @@ class MusicSearchService {
     }
 
     suspend fun searchYouTubeSongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
+        if (youtubeApiKey.isBlank()) {
+            Log.i(TAG, "YOUTUBE_API_KEY is not configured; using the iTunes fallback.")
+            return@withContext emptyList()
+        }
+
         try {
             val encoded = URLEncoder.encode(query, "UTF-8")
             val searchUrl = "https://www.googleapis.com/youtube/v3/search" +
@@ -51,7 +59,7 @@ class MusicSearchService {
                     "&maxResults=$limit" +
                     "&q=$encoded" +
                     "&type=video" +
-                    "&key=$YOUTUBE_API_KEY"
+                    "&key=$youtubeApiKey"
 
             val request = Request.Builder()
                 .url(searchUrl)
@@ -60,7 +68,7 @@ class MusicSearchService {
 
             val response = client.newCall(request).execute()
             if (!response.isSuccessful) {
-                Log.w("MusicSearchService", "YouTube search returned code: ${response.code}")
+                Log.w(TAG, "YouTube search returned code: ${response.code}")
                 return@withContext emptyList()
             }
 
@@ -118,7 +126,7 @@ class MusicSearchService {
                 )
             }
         } catch (e: Exception) {
-            Log.e("MusicSearchService", "YouTube API error: ${e.message}", e)
+            Log.e(TAG, "YouTube API error: ${e.message}", e)
             emptyList()
         }
     }
@@ -130,7 +138,7 @@ class MusicSearchService {
             val url = "https://www.googleapis.com/youtube/v3/videos" +
                     "?part=contentDetails" +
                     "&id=$idsChunk" +
-                    "&key=$YOUTUBE_API_KEY"
+                    "&key=$youtubeApiKey"
 
             val request = Request.Builder().url(url).build()
             val response = client.newCall(request).execute()
@@ -149,7 +157,7 @@ class MusicSearchService {
                 durations[id] = durationMs
             }
         } catch (e: Exception) {
-            Log.w("MusicSearchService", "Error fetching video durations: ${e.message}")
+            Log.w(TAG, "Error fetching video durations: ${e.message}")
         }
         return durations
     }

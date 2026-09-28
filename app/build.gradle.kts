@@ -20,6 +20,14 @@ android {
     versionName = "1.0"
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+
+    val youtubeApiKey = providers.gradleProperty("YOUTUBE_API_KEY")
+      .orElse(providers.environmentVariable("YOUTUBE_API_KEY"))
+      .orElse("")
+      .get()
+      .replace("\\", "\\\\")
+      .replace("\"", "\\\"")
+    buildConfigField("String", "YOUTUBE_API_KEY", "\"$youtubeApiKey\"")
   }
 
   signingConfigs {
