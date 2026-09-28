@@ -118,7 +118,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _isVideoMode.value = enabled
     }
 
-    private val _isLyricsVisible = MutableStateFlow(false)
+    private val _isLyricsVisible = MutableStateFlow(true)
     val isLyricsVisible: StateFlow<Boolean> = _isLyricsVisible.asStateFlow()
 
     fun toggleLyrics() {
@@ -144,6 +144,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val _trendingSongs = MutableStateFlow<List<SongEntity>>(emptyList())
     val trendingSongs: StateFlow<List<SongEntity>> = _trendingSongs.asStateFlow()
+
+    private val playbackQueue = MutableStateFlow<List<SongEntity>>(emptyList())
 
     private var searchJob: Job? = null
     private var progressJob: Job? = null
@@ -268,20 +270,37 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun handleSongEnded() {
         when (_repeatMode.value) {
-            2 -> {
-                seekTo(0)
-                togglePlayPause()
-            }
+            2 -> restartCurrentSong()
             1 -> playNextSong()
             else -> {
-                val songs = allSongs.value
-                if (_currentSongIndex.value < songs.size - 1) {
+                val songs = currentQueue()
+                val index = songs.indexOfFirst { it.id == _currentSong.value?.id }
+                if (index in 0 until songs.lastIndex) {
                     playNextSong()
                 } else {
                     _isPlaying.value = false
                 }
             }
         }
+    }
+
+    private fun restartCurrentSong() {
+        seekTo(0)
+        val song = _currentSong.value ?: return
+        if (song.id.startsWith("yt_")) {
+            streamPlayerManager.play()
+        } else {
+            player.play()
+        }
+        _isPlaying.value = true
+    }
+
+    private fun currentQueue(): List<SongEntity> {
+        val queued = playbackQueue.value
+        if (queued.isNotEmpty()) return queued
+        val library = allSongs.value
+        if (library.isNotEmpty()) return library
+        return _trendingSongs.value
     }
 
     private fun loadTrendingSongs() {
@@ -341,7 +360,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun playSongFromAnywhere(song: SongEntity, autoPlay: Boolean = true) {
+    fun playSongFromAnywhere(
+        song: SongEntity,
+        autoPlay: Boolean = true,
+        queue: List<SongEntity>? = null
+    ) {
+        if (!queue.isNullOrEmpty()) {
+            playbackQueue.value = queue
+        }
         viewModelScope.launch {
             // Save to database so it exists in Room and persists across app restarts
             val existing = repository.getSongById(song.id)
@@ -445,7 +471,17 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun selectSong(song: SongEntity, index: Int, autoPlay: Boolean = true) {
+    fun selectSong(
+        song: SongEntity,
+        index: Int,
+        autoPlay: Boolean = true,
+        queue: List<SongEntity>? = null
+    ) {
+        if (!queue.isNullOrEmpty()) {
+            playbackQueue.value = queue
+        } else if (playbackQueue.value.none { it.id == song.id }) {
+            playbackQueue.value = allSongs.value.ifEmpty { listOf(song) }
+        }
         _currentSong.value = song
         _currentSongIndex.value = index
         _lyrics.value = LyricsParser.parse(song.lyricsLrc)
@@ -512,23 +548,31 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playNextSong() {
-        val songs = allSongs.value
+        val songs = currentQueue()
         if (songs.isEmpty()) return
+        val currentIndex = songs.indexOfFirst { it.id == _currentSong.value?.id }.let { found ->
+            if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
+        }
         val nextIndex = if (_isShuffle.value) {
-            (0 until songs.size).filter { it != _currentSongIndex.value }.randomOrNull() ?: 0
+            songs.indices.filter { it != currentIndex }.randomOrNull() ?: 0
         } else {
-            (_currentSongIndex.value + 1) % songs.size
+            (currentIndex + 1) % songs.size
         }
         selectSong(songs[nextIndex], nextIndex, autoPlay = true)
     }
 
     fun playPreviousSong() {
-        val songs = allSongs.value
+        val songs = currentQueue()
         if (songs.isEmpty()) return
+        val currentIndex = songs.indexOfFirst { it.id == _currentSong.value?.id }.let { found ->
+            if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
+        }
         val prevIndex = if (_currentPositionMs.value > 3000) {
-            _currentSongIndex.value
+            currentIndex
+        } else if (currentIndex - 1 < 0) {
+            songs.lastIndex
         } else {
-            if (_currentSongIndex.value - 1 < 0) songs.size - 1 else _currentSongIndex.value - 1
+            currentIndex - 1
         }
         selectSong(songs[prevIndex], prevIndex, autoPlay = true)
     }

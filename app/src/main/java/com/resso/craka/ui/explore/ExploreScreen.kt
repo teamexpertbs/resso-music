@@ -150,7 +150,7 @@ fun ExploreScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Search & Discover",
+                    text = "Explore",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
@@ -184,7 +184,7 @@ fun ExploreScreen(
         OutlinedTextField(
             value = searchKeyword,
             onValueChange = { searchKeyword = it },
-            placeholder = { Text("Search any song, artist or mood...", color = RessoTextSecondary, fontSize = 13.sp) },
+            placeholder = { Text("Songs, artists, or lyrics", color = RessoTextSecondary, fontSize = 13.sp) },
             leadingIcon = {
                 Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = RessoPrimary)
             },
@@ -401,7 +401,7 @@ fun ExploreScreen(
                         song = song,
                         isPlayingThis = isPlayingThis,
                         onPlay = {
-                            viewModel.playSongFromAnywhere(song, autoPlay = true)
+                            viewModel.playSongFromAnywhere(song, autoPlay = true, queue = displaySongs)
                             onSongSelected()
                         },
                         onToggleLike = {

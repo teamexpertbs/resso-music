@@ -209,7 +209,7 @@ fun LibraryScreen(
                                 song = song,
                                 isPlayingThis = false,
                                 onPlay = {
-                                    viewModel.selectSong(song, index, autoPlay = true)
+                                    viewModel.selectSong(song, index, autoPlay = true, queue = likedSongs)
                                     onSongSelected()
                                 },
                                 onToggleLike = { viewModel.toggleLikeSong(song) }
@@ -361,7 +361,7 @@ fun LibraryScreen(
                                 song = song,
                                 isPlayingThis = false,
                                 onPlay = {
-                                    viewModel.selectSong(song, index, autoPlay = true)
+                                    viewModel.selectSong(song, index, autoPlay = true, queue = customUploads)
                                     onSongSelected()
                                 },
                                 onToggleLike = { viewModel.toggleLikeSong(song) }

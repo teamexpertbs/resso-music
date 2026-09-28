@@ -15,10 +15,12 @@ uploads it as the `Resso-Music-Android-APK` artifact.
 
 ## Optional API configuration
 
-`YOUTUBE_API_KEY` is injected at build time through a Gradle property or
-environment variable. It must never be committed to the repository. If it is
-not configured, YouTube search is skipped and the app uses the iTunes catalog
-fallback.
+`YOUTUBE_API_KEY`, `SPOTIFY_CLIENT_ID`, and `SPOTIFY_CLIENT_SECRET` are
+injected at build time through a Gradle property or environment variable.
+They must never be committed to the repository. YouTube search plays full
+tracks. Spotify supplies track names, artists, and album art, and its 30s
+preview is used only when no matching video is found. Without either key,
+the app uses the iTunes catalog fallback.
 
 The Android app is not a web server, so the Vite files at the repository root
 are separate from the Android build and are not used to produce the APK.

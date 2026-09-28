@@ -218,7 +218,7 @@ class MainActivity : ComponentActivity() {
                                             },
                                             label = {
                                                 Text(
-                                                    "Search",
+                                                    "Explore",
                                                     color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
                                                     fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
                                                 )
@@ -273,11 +273,9 @@ class MainActivity : ComponentActivity() {
                                     (wv.parent as? ViewGroup)?.removeView(wv)
                                     wv
                                 },
-                                modifier = if (isOnlineVideoActive) {
-                                    Modifier.fillMaxSize()
-                                } else {
-                                    Modifier.size(1.dp).alpha(0.001f)
-                                }
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .alpha(if (isOnlineVideoActive) 1f else 0.02f)
                             )
 
                             when (currentTab) {

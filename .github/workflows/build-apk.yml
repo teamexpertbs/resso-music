@@ -19,6 +19,8 @@ jobs:
       JAVA_TOOL_OPTIONS: "-Djava.awt.headless=true"
       GRADLE_OPTS: "-Djava.awt.headless=true -Dorg.gradle.daemon=false -Dorg.gradle.configuration-cache=false"
       YOUTUBE_API_KEY: ${{ secrets.YOUTUBE_API_KEY }}
+      SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
+      SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
 
     steps:
       - name: Checkout Code

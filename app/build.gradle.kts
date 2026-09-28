@@ -21,13 +21,17 @@ android {
 
     testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-    val youtubeApiKey = providers.gradleProperty("YOUTUBE_API_KEY")
-      .orElse(providers.environmentVariable("YOUTUBE_API_KEY"))
-      .orElse("")
-      .get()
-      .replace("\\", "\\\\")
-      .replace("\"", "\\\"")
-    buildConfigField("String", "YOUTUBE_API_KEY", "\"$youtubeApiKey\"")
+    fun secretField(name: String): String {
+      return providers.gradleProperty(name)
+        .orElse(providers.environmentVariable(name))
+        .orElse("")
+        .get()
+        .replace("\\", "\\\\")
+        .replace("\"", "\\\"")
+    }
+    buildConfigField("String", "YOUTUBE_API_KEY", "\"${secretField("YOUTUBE_API_KEY")}\"")
+    buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${secretField("SPOTIFY_CLIENT_ID")}\"")
+    buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${secretField("SPOTIFY_CLIENT_SECRET")}\"")
   }
 
   signingConfigs {

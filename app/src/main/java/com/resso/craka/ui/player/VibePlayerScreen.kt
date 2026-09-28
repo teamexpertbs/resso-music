@@ -3,11 +3,10 @@ package com.resso.craka.ui.player
 import android.Manifest
 import android.content.pm.PackageManager
 import android.net.Uri
-import android.view.ViewGroup
+import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -56,6 +55,7 @@ import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.RepeatOne
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
@@ -195,14 +195,20 @@ fun VibePlayerScreen(
         modifier = modifier
             .fillMaxSize()
             .background(if (isVideoMode && currentSong?.id?.startsWith("yt_") == true) Color.Transparent else Color.Black)
-            .pointerInput(Unit) {
-                detectVerticalDragGestures { _, dragAmount ->
-                    if (dragAmount < -45) {
-                        viewModel.playNextSong()
-                    } else if (dragAmount > 45) {
-                        viewModel.playPreviousSong()
-                    }
-                }
+            .pointerInput(currentSong?.id) {
+                var dragTotal = 0f
+                detectVerticalDragGestures(
+                    onDragStart = { dragTotal = 0f },
+                    onVerticalDrag = { _, dragAmount -> dragTotal += dragAmount },
+                    onDragEnd = {
+                        when {
+                            dragTotal < -90f -> viewModel.playNextSong()
+                            dragTotal > 90f -> viewModel.playPreviousSong()
+                        }
+                        dragTotal = 0f
+                    },
+                    onDragCancel = { dragTotal = 0f }
+                )
             }
             .pointerInput(Unit) {
                 detectTapGestures(
@@ -224,34 +230,20 @@ fun VibePlayerScreen(
             .testTag("vibe_player_screen")
     ) {
         // 1. Dynamic Video / Ambient Vibe Background or Official MV Scrim
-        if (currentSong?.id?.startsWith("yt_") == true) {
-            Box(modifier = Modifier.fillMaxSize()) {
-                AndroidView(
-                    factory = {
-                        val wv = viewModel.streamPlayerManager.getWebView()
-                        (wv.parent as? ViewGroup)?.removeView(wv)
-                        wv
-                    },
-                    modifier = if (isVideoMode) {
-                        Modifier.fillMaxSize()
-                    } else {
-                        Modifier.size(1.dp).background(Color.Transparent)
-                    }
-                )
-                if (isVideoMode) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .background(Color.Black.copy(alpha = 0.2f))
+        if (isVideoMode && currentSong?.id?.startsWith("yt_") == true) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                Color.Black.copy(alpha = 0.15f),
+                                Color.Transparent,
+                                Color.Black.copy(alpha = 0.72f)
+                            )
+                        )
                     )
-                } else {
-                    VideoBackground(
-                        videoUri = currentVibeUri,
-                        filterType = currentVibeFilter,
-                        isPlaying = isPlaying
-                    )
-                }
-            }
+            )
         } else {
             VideoBackground(
                 videoUri = currentVibeUri,
@@ -273,52 +265,11 @@ fun VibePlayerScreen(
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(230.dp)
-                    .clip(RoundedCornerShape(22.dp))
-                    .background(Color(0xE6140D1F))
-                    .border(1.dp, Color.White.copy(alpha = 0.18f), RoundedCornerShape(22.dp))
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
+                    .height(280.dp)
+                    .padding(end = 72.dp)
                     .testTag("lyrics_compact_container")
             ) {
                 Column(modifier = Modifier.fillMaxSize()) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.FormatQuote,
-                                contentDescription = null,
-                                tint = RessoSecondary,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "SYNCED LYRICS",
-                                color = RessoSecondary,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                letterSpacing = 1.2.sp
-                            )
-                        }
-                        IconButton(
-                            onClick = { viewModel.setLyricsVisible(false) },
-                            modifier = Modifier
-                                .size(28.dp)
-                                .testTag("close_lyrics_button")
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Close,
-                                contentDescription = "Close Lyrics",
-                                tint = Color.White.copy(alpha = 0.8f),
-                                modifier = Modifier.size(16.dp)
-                            )
-                        }
-                    }
-
-                    Spacer(modifier = Modifier.height(6.dp))
-
                     if (lyrics.isNotEmpty()) {
                         LazyColumn(
                             state = listState,
@@ -339,14 +290,14 @@ fun VibePlayerScreen(
                                 ) {
                                     Text(
                                         text = lyric.text,
-                                        fontSize = if (isActive) 17.sp else 14.sp,
+                                        fontSize = if (isActive) 26.sp else 16.sp,
                                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
                                         color = when {
                                             isActive -> Color.White
-                                            isPast -> Color.White.copy(alpha = 0.5f)
-                                            else -> Color.White.copy(alpha = 0.35f)
+                                            isPast -> Color.White.copy(alpha = 0.42f)
+                                            else -> Color.White.copy(alpha = 0.28f)
                                         },
-                                        lineHeight = if (isActive) 24.sp else 20.sp
+                                        lineHeight = if (isActive) 32.sp else 22.sp
                                     )
                                 }
                             }
@@ -401,7 +352,7 @@ fun VibePlayerScreen(
                          fontSize = 20.sp,
                          fontWeight = FontWeight.ExtraBold,
                          color = Color.White,
-                         letterSpacing = 1.2.sp
+                         letterSpacing = (-0.4).sp
                      )
                     Text(
                          text = "${currentSong?.mood ?: "Chill"} · ${currentSong?.genre ?: "Pop"}",
@@ -472,50 +423,28 @@ fun VibePlayerScreen(
                 )
             }
 
-            // Lyrics Toggle Button
             PlayerActionButton(
-                icon = Icons.Default.FormatQuote,
-                label = if (isLyricsVisible) "Lyrics ON" else "Lyrics",
-                tint = if (isLyricsVisible) RessoPrimary else Color.White,
-                tag = "player_lyrics_toggle_button",
-                onClick = { viewModel.toggleLyrics() }
+                icon = Icons.Default.Share,
+                label = "Share",
+                tint = Color.White,
+                tag = "player_share_button",
+                onClick = {
+                    val title = currentSong?.title ?: "a song"
+                    val artist = currentSong?.artist ?: "Resso"
+                    val share = Intent(Intent.ACTION_SEND).apply {
+                        type = "text/plain"
+                        putExtra(Intent.EXTRA_TEXT, "Listening to $title by $artist on Resso")
+                    }
+                    context.startActivity(Intent.createChooser(share, "Share"))
+                }
             )
 
-            // Lyric Poster Button
             PlayerActionButton(
                 icon = Icons.Default.AutoAwesome,
-                label = "Poster",
-                tint = RessoTertiary,
+                label = "Vibe",
+                tint = Color.White,
                 tag = "player_lyric_poster_button",
-                onClick = {
-                    viewModel.openLyricPosterDialog(null)
-                }
-            )
-
-            // Flash Torch Beat Sync Button (Real-time physical back flashlight)
-            PlayerActionButton(
-                icon = Icons.Default.FlashOn,
-                label = if (isFlashSyncEnabled) "Torch ON" else "Torch",
-                tint = if (isFlashSyncEnabled) Color(0xFFFFD700) else Color.White,
-                tag = "player_torch_sync_button",
-                onClick = {
-                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) == PackageManager.PERMISSION_GRANTED) {
-                        viewModel.toggleFlashSync()
-                        val state = if (!isFlashSyncEnabled) "ON 🔦 (Song beat par back torch chalegi)" else "OFF"
-                        Toast.makeText(context, "Back Torch Flash: $state", Toast.LENGTH_SHORT).show()
-                    } else {
-                        cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
-                    }
-                }
-            )
-
-            // Sidebar Tools Button (Quick drawer opener)
-            PlayerActionButton(
-                icon = Icons.Default.Tune,
-                label = "Tools",
-                tint = RessoSecondary,
-                tag = "player_tools_sidebar_button",
-                onClick = onOpenSidebar
+                onClick = onOpenVibeCreator
             )
         }
 

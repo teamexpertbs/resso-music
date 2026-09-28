@@ -1,10 +1,12 @@
 package com.resso.craka.data.network
 
+import android.util.Base64
 import android.util.Log
 import com.resso.craka.BuildConfig
 import com.resso.craka.data.model.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import org.json.JSONObject
@@ -22,28 +24,23 @@ class MusicSearchService {
     }
 
     private val youtubeApiKey = BuildConfig.YOUTUBE_API_KEY.trim()
+    private val spotifyClientId = BuildConfig.SPOTIFY_CLIENT_ID.trim()
+    private val spotifyClientSecret = BuildConfig.SPOTIFY_CLIENT_SECRET.trim()
+    private var spotifyToken: String? = null
+    private var spotifyTokenExpiryMs: Long = 0L
 
     suspend fun searchSongs(query: String, limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {
         val trimmed = query.trim()
         if (trimmed.isBlank()) return@withContext emptyList()
 
-        // 1. Try YouTube Data API first for full-length songs
-        val ytSongs = searchYouTubeSongs(trimmed, limit)
-        if (ytSongs.isNotEmpty()) {
-            return@withContext ytSongs
-        }
-
-        // 2. Fallback to iTunes catalog if YouTube yields no results
-        searchItunesSongs(trimmed, limit)
+        val youtubeSongs = searchYouTubeSongs(trimmed, limit)
+        val spotifySongs = searchSpotifySongs(trimmed, limit)
+        val merged = mergeCatalog(youtubeSongs, spotifySongs)
+        if (merged.isNotEmpty()) merged else searchItunesSongs(trimmed, limit)
     }
 
-    suspend fun getTrendingSongs(limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
-        val ytTrending = searchYouTubeSongs("Top Bollywood Hindi Songs", limit)
-        if (ytTrending.isNotEmpty()) {
-            ytTrending
-        } else {
-            searchItunesSongs("Bollywood Hits", limit)
-        }
+    suspend fun getTrendingSongs(limit: Int = 25): List<SongEntity> {
+        return searchSongs("Top Bollywood Hindi Songs", limit)
     }
 
     suspend fun searchYouTubeSongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
@@ -188,6 +185,142 @@ class MusicSearchService {
         } catch (_: Exception) {
             return 210000L
         }
+    }
+
+    suspend fun searchSpotifySongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
+        val token = spotifyAccessToken() ?: return@withContext emptyList()
+        try {
+            val encoded = URLEncoder.encode(query, "UTF-8")
+            val url = "https://api.spotify.com/v1/search?type=track&market=IN&limit=$limit&q=$encoded"
+            val request = Request.Builder()
+                .url(url)
+                .header("Authorization", "Bearer $token")
+                .header("User-Agent", "RessoMusicApp/1.0 (Android)")
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.w(TAG, "Spotify search returned code: ${response.code}")
+                return@withContext emptyList()
+            }
+            val body = response.body?.string() ?: return@withContext emptyList()
+            val tracks = JSONObject(body).optJSONObject("tracks")?.optJSONArray("items")
+                ?: return@withContext emptyList()
+            val songs = mutableListOf<SongEntity>()
+            for (i in 0 until tracks.length()) {
+                val track = tracks.getJSONObject(i)
+                val trackId = track.optString("id", "")
+                val title = track.optString("name", "")
+                if (trackId.isBlank() || title.isBlank()) continue
+                val artists = track.optJSONArray("artists")
+                val artist = buildString {
+                    if (artists != null) {
+                        for (a in 0 until artists.length()) {
+                            if (isNotEmpty()) append(", ")
+                            append(artists.getJSONObject(a).optString("name", ""))
+                        }
+                    }
+                }.ifBlank { "Spotify" }
+                val albumObj = track.optJSONObject("album")
+                val album = albumObj?.optString("name", "Single") ?: "Single"
+                val images = albumObj?.optJSONArray("images")
+                val art = images?.optJSONObject(0)?.optString("url").orEmpty()
+                val preview = track.optString("preview_url", "")
+                val durationMs = track.optLong("duration_ms", 180000L)
+                songs.add(
+                    SongEntity(
+                        id = "sp_$trackId",
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        durationMs = durationMs,
+                        audioUrl = preview,
+                        albumArtUrl = art.ifBlank {
+                            "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"
+                        },
+                        lyricsLrc = "",
+                        genre = "Music",
+                        mood = mapTextToMood("$title $artist"),
+                        isLiked = false,
+                        isCustomUpload = false
+                    )
+                )
+            }
+            songs
+        } catch (e: Exception) {
+            Log.e(TAG, "Spotify search error: ${e.message}", e)
+            emptyList()
+        }
+    }
+
+    private fun spotifyAccessToken(): String? {
+        if (spotifyClientId.isBlank() || spotifyClientSecret.isBlank()) return null
+        val now = System.currentTimeMillis()
+        spotifyToken?.let { cached ->
+            if (now < spotifyTokenExpiryMs) return cached
+        }
+        return try {
+            val basic = Base64.encodeToString(
+                "$spotifyClientId:$spotifyClientSecret".toByteArray(),
+                Base64.NO_WRAP
+            )
+            val body = FormBody.Builder().add("grant_type", "client_credentials").build()
+            val request = Request.Builder()
+                .url("https://accounts.spotify.com/api/token")
+                .header("Authorization", "Basic $basic")
+                .post(body)
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) {
+                Log.w(TAG, "Spotify token request failed: ${response.code}")
+                return null
+            }
+            val json = JSONObject(response.body?.string().orEmpty())
+            val token = json.optString("access_token", "")
+            val expiresIn = json.optLong("expires_in", 3600L)
+            if (token.isBlank()) return null
+            spotifyToken = token
+            spotifyTokenExpiryMs = now + (expiresIn - 30) * 1000L
+            token
+        } catch (e: Exception) {
+            Log.w(TAG, "Spotify auth error: ${e.message}")
+            null
+        }
+    }
+
+    private fun mergeCatalog(youtube: List<SongEntity>, spotify: List<SongEntity>): List<SongEntity> {
+        if (spotify.isEmpty()) return youtube
+        if (youtube.isEmpty()) return spotify.filter { it.audioUrl.isNotBlank() }
+        val usedYoutube = mutableSetOf<String>()
+        val merged = mutableListOf<SongEntity>()
+        for (track in spotify) {
+            val match = youtube.firstOrNull { video ->
+                video.id !in usedYoutube && titlesMatch(track.title, video.title)
+            }
+            if (match != null) {
+                usedYoutube.add(match.id)
+                merged.add(
+                    match.copy(
+                        title = track.title,
+                        artist = track.artist,
+                        album = track.album,
+                        albumArtUrl = track.albumArtUrl.ifBlank { match.albumArtUrl },
+                        durationMs = track.durationMs.takeIf { it > 0L } ?: match.durationMs,
+                        mood = track.mood
+                    )
+                )
+            } else if (track.audioUrl.isNotBlank()) {
+                merged.add(track)
+            }
+        }
+        merged.addAll(youtube.filter { it.id !in usedYoutube })
+        return merged
+    }
+
+    private fun titlesMatch(left: String, right: String): Boolean {
+        val a = left.lowercase().replace(Regex("[^a-z0-9]"), "")
+        val b = right.lowercase().replace(Regex("[^a-z0-9]"), "")
+        if (a.length < 3 || b.length < 3) return false
+        return a == b || a in b || b in a
     }
 
     suspend fun searchItunesSongs(query: String, limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {

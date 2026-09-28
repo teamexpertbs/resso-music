@@ -87,7 +87,7 @@ fun VideoBackground(
             "Dreamy" -> Color(0xFFE056FD).copy(alpha = 0.25f)
             "Retro VHS" -> Color(0xFFFF9F1A).copy(alpha = 0.20f)
             "B&W Noir" -> Color(0xFF333333).copy(alpha = 0.40f)
-            else -> Color(0xFFFF2A6D).copy(alpha = 0.25f) // Neon default
+            else -> Color(0xFFFF2D3A).copy(alpha = 0.22f)
         }
         Box(modifier = Modifier.fillMaxSize().background(filterColor))
 
@@ -138,7 +138,7 @@ fun AmbientVibeCanvas(filterType: String, isPlaying: Boolean) {
         "Dreamy" -> Triple(Color(0xFFFF9A9E), Color(0xFFFECFEF), Color(0xFFA1C4FD))
         "Retro VHS" -> Triple(Color(0xFFFF5722), Color(0xFFFFC107), Color(0xFF3E2723))
         "B&W Noir" -> Triple(Color(0xFF757575), Color(0xFF424242), Color(0xFF212121))
-        else -> Triple(Color(0xFFFF2A6D), Color(0xFF05D9E8), Color(0xFF7928CA))
+        else -> Triple(Color(0xFFFF2D3A), Color(0xFFFF6B76), Color(0xFF3A0A10))
     }
 
     Canvas(modifier = Modifier.fillMaxSize()) {

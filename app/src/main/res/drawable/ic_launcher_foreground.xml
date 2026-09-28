@@ -1,54 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <group
-        android:scaleX="1.38"
-        android:scaleY="1.38"
-        android:pivotX="23.35"
-        android:pivotY="23.70"
-        android:translateX="30.65"
-        android:translateY="30.30">
-        <!-- Main R-ribbon outer path -->
-        <path
-            android:pathData="M 7.324,31.275 v 6.287 c 0,3.796 4.109,6.168 7.396,4.27 L 38.21,28.27 c 3.287,-1.898 3.287,-6.642 0,-8.54 L 14.72,6.168 c -3.287,-1.898 -7.396,0.474 -7.396,4.27 v 11.789"
-            android:strokeWidth="5.0"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round">
-            <aapt:attr name="android:strokeColor">
-                <gradient
-                    android:startX="7.32"
-                    android:startY="6.17"
-                    android:endX="38.21"
-                    android:endY="41.24"
-                    android:type="linear">
-                    <item android:color="#FFFF0055" android:offset="0.0" />
-                    <item android:color="#FFFF2A6D" android:offset="0.5" />
-                    <item android:color="#FFFF5252" android:offset="1.0" />
-                </gradient>
-            </aapt:attr>
-        </path>
-        <!-- Second inner play triangle ribbon stroke -->
-        <path
-            android:pathData="M 39.373,41.239 L 14.72,27.005 c -3.287,-1.897 -7.396,0.475 -7.396,4.27 v 6.287 c 0,3.796 4.109,6.168 7.396,4.27"
-            android:strokeWidth="5.0"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round">
-            <aapt:attr name="android:strokeColor">
-                <gradient
-                    android:startX="7.32"
-                    android:startY="27.0"
-                    android:endX="39.37"
-                    android:endY="41.24"
-                    android:type="linear">
-                    <item android:color="#FFFF0055" android:offset="0.0" />
-                    <item android:color="#FFFF2A6D" android:offset="0.5" />
-                    <item android:color="#FFFF5252" android:offset="1.0" />
-                </gradient>
-            </aapt:attr>
-        </path>
-    </group>
+    <!-- Resso-style red ribbon R that also reads as a play mark. -->
+    <path
+        android:fillColor="#FFFF2D3A"
+        android:fillType="evenOdd"
+        android:pathData="M31,24h22c13.8,0 24,9.4 24,22.2c0,9.6 -5.2,17.2 -13.4,20.4L78,86H64.2L51.6,68H43V86H31V24zM43,36v20h10.2c6.4,0 11.2,-4.2 11.2,-10.2c0,-5.8 -4.6,-9.8 -11,-9.8H43z" />
 </vector>

@@ -6,6 +6,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import android.view.ViewGroup
+import android.webkit.CookieManager
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -62,6 +63,9 @@ class StreamPlayerManager(private val context: Context) {
             settings.cacheMode = WebSettings.LOAD_DEFAULT
             settings.userAgentString = "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 
+            CookieManager.getInstance().setAcceptCookie(true)
+            CookieManager.getInstance().setAcceptThirdPartyCookies(wv, true)
+            wv.setBackgroundColor(android.graphics.Color.BLACK)
             wv.webChromeClient = WebChromeClient()
             wv.webViewClient = object : WebViewClient() {
                 override fun onPageFinished(view: WebView?, url: String?) {
@@ -83,7 +87,7 @@ class StreamPlayerManager(private val context: Context) {
         if (webView == null) {
             initWebView()
         }
-        return webView!!
+        return webView ?: WebView(context.applicationContext).also { webView = it }
     }
 
     fun loadAndPlay(videoId: String, autoPlay: Boolean = true) {
