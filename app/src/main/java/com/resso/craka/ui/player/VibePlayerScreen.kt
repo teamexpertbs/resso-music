@@ -777,7 +777,7 @@ fun PlayerActionButton(
             modifier = Modifier
                 .size(44.dp)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.42f))
+                .background(Color.Black.copy(alpha = 0.42f)),
             contentAlignment = Alignment.Center
         ) {
             Icon(
