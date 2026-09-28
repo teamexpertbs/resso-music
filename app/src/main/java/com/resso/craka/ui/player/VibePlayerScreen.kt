@@ -83,6 +83,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.input.pointer.pointerInput
@@ -393,15 +394,15 @@ fun VibePlayerScreen(
                 Spacer(modifier = Modifier.width(10.dp))
 
                 Column {
+                     Text(
+                         text = "resso",
+                         fontSize = 20.sp,
+                         fontWeight = FontWeight.ExtraBold,
+                         color = Color.White,
+                         letterSpacing = 1.2.sp
+                     )
                     Text(
-                        text = "VIBE STREAM",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Black,
-                        color = RessoSecondary,
-                        letterSpacing = 2.sp
-                    )
-                    Text(
-                        text = "${currentSong?.mood ?: "Chill"} • ${currentSong?.genre ?: "Pop"}",
+                         text = "${currentSong?.mood ?: "Chill"} · ${currentSong?.genre ?: "Pop"}",
                         fontSize = 11.sp,
                         color = Color.White.copy(alpha = 0.7f)
                     )
@@ -431,7 +432,7 @@ fun VibePlayerScreen(
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Text(
-                                text = if (isVideoMode) "MV ON" else "Watch MV",
+                             text = if (isVideoMode) "MV" else "Video",
                                 color = Color.White,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold
@@ -458,7 +459,7 @@ fun VibePlayerScreen(
                         )
                         Spacer(modifier = Modifier.width(4.dp))
                         Text(
-                            text = if (isLyricsVisible) "Lyrics ON" else "Lyrics",
+                             text = "Lyrics",
                             color = Color.White,
                             fontSize = 11.sp,
                             fontWeight = FontWeight.Bold
@@ -492,7 +493,7 @@ fun VibePlayerScreen(
         Column(
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 10.dp, bottom = 108.dp),
+                .padding(end = 12.dp, bottom = 116.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -581,8 +582,16 @@ fun VibePlayerScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .background(Color.Black.copy(alpha = 0.75f))
-                .padding(horizontal = 16.dp, vertical = 6.dp)
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(
+                            Color.Transparent,
+                            Color.Black.copy(alpha = 0.38f),
+                            Color.Black.copy(alpha = 0.94f)
+                        )
+                    )
+                )
+                .padding(horizontal = 18.dp, vertical = 10.dp)
         ) {
             // Track Info & Artist
             Row(
@@ -620,7 +629,7 @@ fun VibePlayerScreen(
 
                 // Swipe hints
                 Text(
-                    text = "Swipe ↑↓ for songs",
+                    text = "Swipe to switch",
                     fontSize = 10.sp,
                     color = RessoTextSecondary.copy(alpha = 0.7f)
                 )
@@ -766,22 +775,22 @@ fun PlayerActionButton(
     ) {
         Box(
             modifier = Modifier
-                .size(38.dp)
+                .size(44.dp)
                 .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.5f)),
+                .background(Color.Black.copy(alpha = 0.42f))
             contentAlignment = Alignment.Center
         ) {
             Icon(
                 imageVector = icon,
                 contentDescription = label,
                 tint = tint,
-                modifier = Modifier.size(20.dp)
+                modifier = Modifier.size(21.dp)
             )
         }
         Spacer(modifier = Modifier.height(2.dp))
         Text(
             text = label,
-            fontSize = 10.sp,
+            fontSize = 11.sp,
             fontWeight = FontWeight.Medium,
             color = Color.White
         )
