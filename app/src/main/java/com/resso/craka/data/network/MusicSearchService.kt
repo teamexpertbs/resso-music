@@ -9,6 +9,7 @@ import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
@@ -33,14 +34,39 @@ class MusicSearchService {
         val trimmed = query.trim()
         if (trimmed.isBlank()) return@withContext emptyList()
 
+        val spotifySongs = searchSpotifySongs(trimmed, limit.coerceAtMost(10))
+        val playableSpotify = attachYouTubePlayback(spotifySongs.take(6))
         val youtubeSongs = searchYouTubeSongs(trimmed, limit)
-        val spotifySongs = searchSpotifySongs(trimmed, limit)
-        val merged = mergeCatalog(youtubeSongs, spotifySongs)
+        val merged = (playableSpotify + youtubeSongs).distinctBy { it.id }
         if (merged.isNotEmpty()) merged else searchItunesSongs(trimmed, limit)
     }
 
-    suspend fun getTrendingSongs(limit: Int = 25): List<SongEntity> {
-        return searchSongs("Top Bollywood Hindi Songs", limit)
+    suspend fun getTrendingSongs(limit: Int = 8): List<SongEntity> = withContext(Dispatchers.IO) {
+        val spotifyHits = searchSpotifySongs("Bollywood Hits", limit)
+        val playable = attachYouTubePlayback(spotifyHits)
+        if (playable.isNotEmpty()) playable else searchSongs("Top Bollywood Hindi Songs", limit)
+    }
+
+    private suspend fun attachYouTubePlayback(tracks: List<SongEntity>): List<SongEntity> {
+        if (tracks.isEmpty()) return emptyList()
+        if (youtubeApiKey.isBlank()) return tracks.filter { it.audioUrl.isNotBlank() }
+        val playable = mutableListOf<SongEntity>()
+        for (track in tracks) {
+            val videos = searchYouTubeSongs("${track.title} ${track.artist} audio", 5)
+            val match = videos.firstOrNull { titlesMatch(track.title, it.title) } ?: videos.firstOrNull()
+            if (match != null) {
+                playable.add(
+                    match.copy(
+                        title = track.title,
+                        artist = track.artist,
+                        album = track.album,
+                        albumArtUrl = track.albumArtUrl.ifBlank { match.albumArtUrl },
+                        mood = track.mood
+                    )
+                )
+            }
+        }
+        return playable
     }
 
     suspend fun searchYouTubeSongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
@@ -386,32 +412,61 @@ class MusicSearchService {
     }
 
     suspend fun fetchSyncedLyrics(artist: String, title: String): String? = withContext(Dispatchers.IO) {
-        try {
-            val cleanTitle = cleanSongTitleForLyrics(title)
-            val cleanArtist = artist.split(",", "&", "feat.", "ft.", "/", "-").first().trim()
+        val cleanTitle = cleanSongTitleForLyrics(title)
+        val cleanArtist = artist.split(",", "&", "feat.", "ft.", "/", "-").first().trim()
+        if (cleanTitle.isBlank()) return@withContext null
+        searchLrcLib(cleanArtist, cleanTitle)
+            ?: searchLrcLib("", cleanTitle)
+            ?: fetchPlainLyrics(cleanArtist, cleanTitle)
+    }
 
-            val encodedArtist = URLEncoder.encode(cleanArtist, "UTF-8")
-            val encodedTitle = URLEncoder.encode(cleanTitle, "UTF-8")
-            val url = "https://lrclib.net/api/get?artist_name=$encodedArtist&track_name=$encodedTitle"
-
+    private fun searchLrcLib(artist: String, title: String): String? {
+        return try {
+            val url = buildString {
+                append("https://lrclib.net/api/search?track_name=")
+                append(URLEncoder.encode(title, "UTF-8"))
+                if (artist.isNotBlank()) {
+                    append("&artist_name=")
+                    append(URLEncoder.encode(artist, "UTF-8"))
+                }
+            }
             val request = Request.Builder()
                 .url(url)
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
-
             val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext null
-
-            val body = response.body?.string() ?: return@withContext null
-            val json = JSONObject(body)
-
-            val synced = json.optString("syncedLyrics", "")
-            if (synced.isNotBlank()) return@withContext synced
-
-            val plain = json.optString("plainLyrics", "")
-            if (plain.isNotBlank()) return@withContext plain
-
+            if (!response.isSuccessful) return null
+            val items = JSONArray(response.body?.string().orEmpty())
+            var bestSynced = ""
+            var bestPlain = ""
+            for (i in 0 until items.length()) {
+                val item = items.getJSONObject(i)
+                val synced = item.optString("syncedLyrics", "")
+                val plain = item.optString("plainLyrics", "")
+                if (synced.length > bestSynced.length) bestSynced = synced
+                if (plain.length > bestPlain.length) bestPlain = plain
+            }
+            bestSynced.ifBlank { bestPlain.ifBlank { null } }
+        } catch (e: Exception) {
+            Log.w(TAG, "Lyrics search failed: ${e.message}")
             null
+        }
+    }
+
+    private fun fetchPlainLyrics(artist: String, title: String): String? {
+        if (artist.isBlank()) return null
+        return try {
+            val url = "https://api.lyrics.ovh/v1/" +
+                URLEncoder.encode(artist, "UTF-8") + "/" +
+                URLEncoder.encode(title, "UTF-8")
+            val request = Request.Builder()
+                .url(url)
+                .header("User-Agent", "RessoMusicApp/1.0 (Android)")
+                .build()
+            val response = client.newCall(request).execute()
+            if (!response.isSuccessful) return null
+            val lyrics = JSONObject(response.body?.string().orEmpty()).optString("lyrics", "").trim()
+            lyrics.ifBlank { null }
         } catch (_: Exception) {
             null
         }

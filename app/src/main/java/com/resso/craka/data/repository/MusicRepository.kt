@@ -29,6 +29,7 @@ class MusicRepository(context: Context) {
     init {
         CoroutineScope(Dispatchers.IO).launch {
             seedInitialDataIfEmpty()
+            songDao.clearPlaceholderLyrics()
         }
     }
 

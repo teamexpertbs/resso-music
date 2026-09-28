@@ -64,8 +64,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.resso.craka.data.model.SongEntity
+import com.resso.craka.ui.components.AlbumArtwork
 import com.resso.craka.ui.theme.RessoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoPrimary
@@ -449,10 +449,10 @@ fun SongListItem(
                     .clip(RoundedCornerShape(10.dp))
                     .background(RessoCardBg)
             ) {
-                AsyncImage(
-                    model = song.albumArtUrl,
+                AlbumArtwork(
+                    songId = song.id,
+                    albumArtUrl = song.albumArtUrl,
                     contentDescription = song.title,
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
                 if (isPlayingThis) {

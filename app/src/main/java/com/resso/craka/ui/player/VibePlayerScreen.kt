@@ -87,6 +87,7 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -95,6 +96,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.resso.craka.ui.components.AlbumArtwork
 import com.resso.craka.ui.components.VideoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoGreen
@@ -117,6 +119,7 @@ fun VibePlayerScreen(
 ) {
     val currentSong by viewModel.currentSong.collectAsState()
     val lyrics by viewModel.lyrics.collectAsState()
+    val lyricsStatus by viewModel.lyricsStatus.collectAsState()
     val activeLyricIndex by viewModel.activeLyricIndex.collectAsState()
     val currentPos by viewModel.currentPositionMs.collectAsState()
     val duration by viewModel.durationMs.collectAsState()
@@ -253,65 +256,96 @@ fun VibePlayerScreen(
             )
         }
 
-        // 2. Synced Scrolling Lyrics Layer (Compact, Floating & Toggleable - NOT Full Screen)
-        AnimatedVisibility(
-            visible = isLyricsVisible,
-            enter = fadeIn() + scaleIn(initialScale = 0.92f),
-            exit = fadeOut() + scaleOut(targetScale = 0.92f),
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
-        ) {
-            Box(
+        val showMusicVideo = isVideoMode && currentSong?.id?.startsWith("yt_") == true
+        if (!showMusicVideo) {
+            Column(
                 modifier = Modifier
+                    .align(Alignment.Center)
                     .fillMaxWidth()
-                    .height(280.dp)
-                    .padding(end = 72.dp)
-                    .testTag("lyrics_compact_container")
+                    .padding(start = 28.dp, end = 78.dp, bottom = 36.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(modifier = Modifier.fillMaxSize()) {
-                    if (lyrics.isNotEmpty()) {
-                        LazyColumn(
-                            state = listState,
-                            modifier = Modifier.fillMaxSize(),
-                            contentPadding = PaddingValues(vertical = 4.dp)
-                        ) {
-                            itemsIndexed(lyrics) { index, lyric ->
-                                val isActive = index == activeLyricIndex
-                                val isPast = index < activeLyricIndex
-
-                                Box(
-                                    modifier = Modifier
-                                        .fillMaxWidth()
-                                        .padding(vertical = 4.dp)
-                                        .clip(RoundedCornerShape(6.dp))
-                                        .clickable { viewModel.seekTo(lyric.timeMs) }
-                                        .testTag("lyric_line_$index")
-                                ) {
+                AlbumArtwork(
+                    songId = currentSong?.id,
+                    albumArtUrl = currentSong?.albumArtUrl,
+                    contentDescription = currentSong?.title ?: "Song thumbnail",
+                    modifier = Modifier
+                        .size(if (isLyricsVisible && lyrics.isNotEmpty()) 148.dp else 232.dp)
+                        .clip(RoundedCornerShape(18.dp))
+                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
+                        .testTag("player_album_art")
+                )
+                if (isLyricsVisible) {
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(if (lyrics.isNotEmpty()) 132.dp else 36.dp)
+                            .testTag("lyrics_compact_container")
+                    ) {
+                        if (lyrics.isNotEmpty()) {
+                            LazyColumn(
+                                state = listState,
+                                modifier = Modifier.fillMaxSize(),
+                                contentPadding = PaddingValues(vertical = 2.dp)
+                            ) {
+                                itemsIndexed(lyrics) { index, lyric ->
+                                    val isActive = index == activeLyricIndex
+                                    val isPast = index < activeLyricIndex
                                     Text(
                                         text = lyric.text,
-                                        fontSize = if (isActive) 26.sp else 16.sp,
+                                        fontSize = if (isActive) 18.sp else 14.sp,
                                         fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
                                         color = when {
                                             isActive -> Color.White
                                             isPast -> Color.White.copy(alpha = 0.42f)
                                             else -> Color.White.copy(alpha = 0.28f)
                                         },
-                                        lineHeight = if (isActive) 32.sp else 22.sp
+                                        maxLines = 2,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .padding(vertical = 3.dp)
+                                            .clickable { viewModel.seekTo(lyric.timeMs) }
+                                            .testTag("lyric_line_$index")
                                     )
                                 }
                             }
-                        }
-                    } else {
-                        Box(
-                            modifier = Modifier.fillMaxSize(),
-                            contentAlignment = Alignment.Center
-                        ) {
+                        } else {
                             Text(
-                                text = "No synced lyrics available for this track",
-                                color = Color.White.copy(alpha = 0.6f),
-                                fontSize = 13.sp
+                                text = lyricsStatus.ifBlank { "Lyrics not available for this song" },
+                                color = Color.White.copy(alpha = 0.75f),
+                                fontSize = 13.sp,
+                                textAlign = TextAlign.Center,
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+        } else if (isLyricsVisible) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .fillMaxWidth()
+                    .padding(start = 20.dp, end = 78.dp, bottom = 80.dp)
+                    .height(180.dp)
+                    .testTag("lyrics_compact_container")
+            ) {
+                if (lyrics.isNotEmpty()) {
+                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
+                        itemsIndexed(lyrics) { index, lyric ->
+                            val isActive = index == activeLyricIndex
+                            Text(
+                                text = lyric.text,
+                                fontSize = if (isActive) 20.sp else 15.sp,
+                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.4f),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 3.dp)
+                                    .clickable { viewModel.seekTo(lyric.timeMs) }
+                                    .testTag("lyric_line_$index")
                             )
                         }
                     }
@@ -405,8 +439,8 @@ fun VibePlayerScreen(
         // 4. Right Side Action Bar
         Column(
             modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(end = 8.dp, bottom = 196.dp),
+                .align(Alignment.CenterEnd)
+                .padding(end = 6.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
@@ -490,6 +524,16 @@ fun VibePlayerScreen(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
+                AlbumArtwork(
+                    songId = currentSong?.id,
+                    albumArtUrl = currentSong?.albumArtUrl,
+                    contentDescription = currentSong?.title,
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .testTag("player_now_playing_thumb")
+                )
+                Spacer(modifier = Modifier.width(10.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
                         text = currentSong?.title ?: "Select a Track",
@@ -501,7 +545,10 @@ fun VibePlayerScreen(
                     )
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Text(
-                            text = currentSong?.artist ?: "Resso Artist",
+                            text = listOfNotNull(
+                                currentSong?.artist,
+                                currentSong?.album?.takeIf { it.isNotBlank() && it != "Official Stream" }
+                            ).joinToString(" · ").ifBlank { "Resso" },
                             style = MaterialTheme.typography.bodySmall,
                             color = RessoTextSecondary,
                             maxLines = 1,

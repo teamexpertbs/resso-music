@@ -82,6 +82,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _lyrics = MutableStateFlow<List<LyricLine>>(emptyList())
     val lyrics: StateFlow<List<LyricLine>> = _lyrics.asStateFlow()
 
+    private val _lyricsStatus = MutableStateFlow("")
+    val lyricsStatus: StateFlow<String> = _lyricsStatus.asStateFlow()
+
     private val _activeLyricIndex = MutableStateFlow(0)
     val activeLyricIndex: StateFlow<Int> = _activeLyricIndex.asStateFlow()
 
@@ -327,8 +330,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             try {
                 val trending = repository.getTrendingSongs()
-                if (trending.isNotEmpty()) {
-                    _trendingSongs.value = trending
+                if (trending.isEmpty()) return@launch
+                _trendingSongs.value = trending
+                playbackQueue.value = trending
+                val current = _currentSong.value
+                if (current == null || needsRealLyrics(current.lyricsLrc)) {
+                    selectSong(trending.first(), 0, autoPlay = false, queue = trending)
                 }
             } catch (e: Exception) {
                 Log.w("MusicViewModel", "Error loading trending: ${e.message}")
@@ -416,29 +423,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (_currentSong.value?.id == song.id) {
                     _currentSong.value = _currentSong.value?.copy(lyricsLrc = fetchedLyrics)
                     _lyrics.value = LyricsParser.parse(fetchedLyrics)
+                    _lyricsStatus.value = ""
                 }
-            } else {
-                val fallbackLrc = buildFallbackLyrics(song)
-                repository.updateSongLyrics(song.id, fallbackLrc)
-                if (_currentSong.value?.id == song.id) {
-                    _currentSong.value = _currentSong.value?.copy(lyricsLrc = fallbackLrc)
-                    _lyrics.value = LyricsParser.parse(fallbackLrc)
-                }
+            } else if (_currentSong.value?.id == song.id) {
+                _lyrics.value = emptyList()
+                _lyricsStatus.value = "Lyrics not available for this song"
             }
         }
     }
 
-    private fun buildFallbackLyrics(song: SongEntity): String {
-        return """
-            [00:00.00] ♪ Now playing: ${song.title} ♪
-            [00:05.00] 🎤 ${song.artist}
-            [00:10.00] Feel the rhythm & bass drop...
-            [00:18.00] ✨ High Fidelity Audio Streaming ✨
-            [00:26.00] Enjoying the vibe on Resso Music
-            [00:35.00] Tap to share lyric poster or create vibe video
-            [00:45.00] ♪ Let the rhythm flow ♪
-            [00:55.00] ${song.album}
-        """.trimIndent()
+    private fun needsRealLyrics(lrc: String): Boolean {
+        if (lrc.isBlank()) return true
+        return lrc.contains("High Fidelity") ||
+            lrc.contains("Feel the rhythm") ||
+            lrc.contains("Now playing:") ||
+            lrc.contains("Gentle Piano") ||
+            lrc.contains("Enjoying the vibe")
     }
 
     private fun setupPlayerListener() {
@@ -504,7 +504,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
         _currentSong.value = song
         _currentSongIndex.value = index
-        _lyrics.value = LyricsParser.parse(song.lyricsLrc)
+        if (needsRealLyrics(song.lyricsLrc)) {
+            _lyrics.value = emptyList()
+            _lyricsStatus.value = "Finding lyrics…"
+        } else {
+            _lyrics.value = LyricsParser.parse(song.lyricsLrc)
+            _lyricsStatus.value = ""
+        }
         _currentVibeUri.value = song.vibeVideoUri
         _activeLyricIndex.value = 0
         _currentPositionMs.value = 0L
@@ -540,7 +546,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             }
         }
 
-        if (song.lyricsLrc.isBlank()) {
+        if (needsRealLyrics(song.lyricsLrc)) {
             fetchAndApplyLyrics(song)
         }
         publishPlayback(autoPlay)
@@ -555,7 +561,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             context = getApplication(),
             title = song.title,
             artist = song.artist,
-            playing = playing
+            playing = playing,
+            artUrl = song.albumArtUrl,
+            songId = song.id
         )
     }
 

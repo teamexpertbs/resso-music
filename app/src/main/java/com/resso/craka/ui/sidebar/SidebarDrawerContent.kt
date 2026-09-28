@@ -62,7 +62,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
+import com.resso.craka.ui.components.AlbumArtwork
 import com.resso.craka.ui.theme.RessoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoGreen
@@ -195,10 +195,10 @@ fun SidebarDrawerContent(
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color.DarkGray)
                     ) {
-                        AsyncImage(
-                            model = currentSong?.albumArtUrl,
+                        AlbumArtwork(
+                            songId = currentSong?.id,
+                            albumArtUrl = currentSong?.albumArtUrl,
                             contentDescription = currentSong?.title,
-                            contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize()
                         )
                         if (isPlaying) {

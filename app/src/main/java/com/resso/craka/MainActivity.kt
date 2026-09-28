@@ -74,8 +74,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import coil.compose.AsyncImage
 import com.resso.craka.ui.comments.CommentsBottomSheet
+import com.resso.craka.ui.components.AlbumArtwork
 import com.resso.craka.ui.explore.ExploreScreen
 import com.resso.craka.ui.library.LibraryScreen
 import com.resso.craka.ui.lyrics.LyricPosterDialog
@@ -179,6 +179,7 @@ class MainActivity : ComponentActivity() {
                                     // Mini player bar when navigating outside the main For You player
                                     if (currentTab != "foryou" && currentSong != null) {
                                         MiniPlayerBar(
+                                            songId = currentSong?.id,
                                             songTitle = currentSong?.title ?: "",
                                             artist = currentSong?.artist ?: "",
                                             albumArtUrl = currentSong?.albumArtUrl ?: "",
@@ -340,6 +341,7 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MiniPlayerBar(
+    songId: String?,
     songTitle: String,
     artist: String,
     albumArtUrl: String,
@@ -367,10 +369,10 @@ fun MiniPlayerBar(
                     .clip(RoundedCornerShape(8.dp))
                     .background(RessoSurface)
             ) {
-                AsyncImage(
-                    model = albumArtUrl,
+                AlbumArtwork(
+                    songId = songId,
+                    albumArtUrl = albumArtUrl,
                     contentDescription = songTitle,
-                    contentScale = ContentScale.Crop,
                     modifier = Modifier.fillMaxSize()
                 )
             }

@@ -48,6 +48,13 @@ interface SongDao {
     @Query("UPDATE songs SET lyricsLrc = :lyrics WHERE id = :id")
     suspend fun updateSongLyrics(id: String, lyrics: String)
 
+    @Query(
+        "UPDATE songs SET lyricsLrc = '' WHERE lyricsLrc LIKE '%High Fidelity%' " +
+            "OR lyricsLrc LIKE '%Feel the rhythm%' OR lyricsLrc LIKE '%Now playing:%' " +
+            "OR lyricsLrc LIKE '%Gentle Piano%' OR lyricsLrc LIKE '%Enjoying the vibe%'"
+    )
+    suspend fun clearPlaceholderLyrics()
+
     @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR genre LIKE '%' || :query || '%'")
     suspend fun searchLocalSongs(query: String): List<SongEntity>
 }

@@ -64,7 +64,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
 import com.resso.craka.data.model.VibeEntity
 import com.resso.craka.ui.explore.SongListItem
 import com.resso.craka.ui.theme.RessoBackground
