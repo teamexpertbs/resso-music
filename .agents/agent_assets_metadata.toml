@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "12Y78EFPJPU4WIkwg7SEg"
+uri = "file://output_apk/Resso-Music.apk"
+type = "unspecified"
+title = "Resso Music Android APK"
+description = "GitHub Actions से सफलतापूर्वक बने responsive UI वाला debug APK. इसे Android फोन पर install करके नया UI देखें।"
+logical_id = "602011d6-1efc-4fe6-bfa3-46ba93866360"
+content_hash = "sha256:dc4ff1d801fab63f3585ba3e0da425728205645e77ae33abe5d931d2f83a8770"
+size = 26409773
+mtime_ms = 1790610331118
+storage_uri = "gcs://replit-rams-assets-sisko/rams/assets/repl:7d0c71ac-be78-47f8-99bf-6c5f7226842b/602011d6-1efc-4fe6-bfa3-46ba93866360/8a21139f-9bbf-4f3e-b990-cef74548346a"
+storage_version_token = "1790610345347396"
+content_type = "application/octet-stream"
