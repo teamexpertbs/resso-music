@@ -27,7 +27,7 @@ interface SongDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertSongs(songs: List<SongEntity>)
 
-    @Query("DELETE FROM songs WHERE id NOT LIKE 'yt_%'")
+    @Query("DELETE FROM songs WHERE id NOT LIKE 'yt_%' AND id NOT LIKE 'custom_%' AND id NOT LIKE 'online_%' AND isCustomUpload = 0")
     suspend fun clearOldNonYtSongs()
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
