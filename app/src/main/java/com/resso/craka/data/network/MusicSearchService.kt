@@ -5,6 +5,9 @@ import android.util.Log
 import com.resso.craka.BuildConfig
 import com.resso.craka.data.model.SongEntity
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withContext
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
@@ -34,39 +37,38 @@ class MusicSearchService {
         val trimmed = query.trim()
         if (trimmed.isBlank()) return@withContext emptyList()
 
-        val spotifySongs = searchSpotifySongs(trimmed, limit.coerceAtMost(10))
-        val playableSpotify = attachYouTubePlayback(spotifySongs.take(6))
-        val youtubeSongs = searchYouTubeSongs(trimmed, limit)
+        val spotifySongs = searchSpotifySongs(trimmed, 8)
+        val playableSpotify = attachYouTubePlayback(spotifySongs.take(3))
+        if (playableSpotify.size >= 3) return@withContext playableSpotify
+        val youtubeSongs = searchYouTubeSongs(trimmed, 6)
         val merged = (playableSpotify + youtubeSongs).distinctBy { it.id }
-        if (merged.isNotEmpty()) merged else searchItunesSongs(trimmed, limit)
+        if (merged.isNotEmpty()) merged else searchItunesSongs(trimmed, 8)
     }
 
-    suspend fun getTrendingSongs(limit: Int = 8): List<SongEntity> = withContext(Dispatchers.IO) {
+    suspend fun getTrendingSongs(limit: Int = 6): List<SongEntity> = withContext(Dispatchers.IO) {
         val spotifyHits = searchSpotifySongs("Bollywood Hits", limit)
-        val playable = attachYouTubePlayback(spotifyHits)
-        if (playable.isNotEmpty()) playable else searchSongs("Top Bollywood Hindi Songs", limit)
+        val playable = attachYouTubePlayback(spotifyHits.take(4))
+        if (playable.isNotEmpty()) playable else searchYouTubeSongs("Top Bollywood Hindi Songs", limit)
     }
 
     private suspend fun attachYouTubePlayback(tracks: List<SongEntity>): List<SongEntity> {
         if (tracks.isEmpty()) return emptyList()
         if (youtubeApiKey.isBlank()) return tracks.filter { it.audioUrl.isNotBlank() }
-        val playable = mutableListOf<SongEntity>()
-        for (track in tracks) {
-            val videos = searchYouTubeSongs("${track.title} ${track.artist} audio", 5)
-            val match = videos.firstOrNull { titlesMatch(track.title, it.title) } ?: videos.firstOrNull()
-            if (match != null) {
-                playable.add(
-                    match.copy(
+        return coroutineScope {
+            tracks.map { track ->
+                async {
+                    val videos = searchYouTubeSongs("${track.title} ${track.artist}", 3)
+                    val match = videos.firstOrNull { titlesMatch(track.title, it.title) } ?: videos.firstOrNull()
+                    match?.copy(
                         title = track.title,
                         artist = track.artist,
                         album = track.album,
                         albumArtUrl = track.albumArtUrl.ifBlank { match.albumArtUrl },
                         mood = track.mood
                     )
-                )
-            }
+                }
+            }.awaitAll().filterNotNull()
         }
-        return playable
     }
 
     suspend fun searchYouTubeSongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {

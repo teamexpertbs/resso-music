@@ -155,7 +155,7 @@ class StreamPlayerManager(private val context: Context) {
             webView?.onResume()
             webView?.resumeTimers()
             nudgePlayback()
-            mainHandler.postDelayed(this, 900)
+            mainHandler.postDelayed(this, 2500)
         }
     }
 
@@ -164,6 +164,15 @@ class StreamPlayerManager(private val context: Context) {
             "if (window.shouldResume && player && player.getPlayerState && player.getPlayerState() !== 1 && player.getPlayerState() !== 3) { player.playVideo(); }",
             null
         )
+    }
+
+    fun setHighQuality(enabled: Boolean) {
+        mainHandler.post {
+            webView?.evaluateJavascript(
+                "window.wantHd = $enabled; if (window.applyQuality) { window.applyQuality(); }",
+                null
+            )
+        }
     }
 
     fun play() {
@@ -323,12 +332,14 @@ class StreamPlayerManager(private val context: Context) {
                             height: '100%',
                             width: '100%',
                             playerVars: {
-                                'autoplay': 1,
+                                'autoplay': 0,
                                 'controls': 0,
                                 'playsinline': 1,
                                 'rel': 0,
                                 'fs': 0,
                                 'modestbranding': 1,
+                                'iv_load_policy': 3,
+                                'vq': 'small',
                                 'origin': 'https://www.youtube-nocookie.com'
                             },
                             events: {
@@ -346,7 +357,18 @@ class StreamPlayerManager(private val context: Context) {
                         }
                     }
 
+                    window.wantHd = false;
+                    window.applyQuality = function() {
+                        if (!player || !player.setPlaybackQuality) return;
+                        var q = window.wantHd ? 'large' : 'small';
+                        try { player.setPlaybackQuality(q); } catch (e) {}
+                        try {
+                            if (player.setPlaybackQualityRange) player.setPlaybackQualityRange('tiny', q);
+                        } catch (e) {}
+                    };
+
                     function onPlayerStateChange(event) {
+                        if (event.data === 1) window.applyQuality();
                         if (window.AndroidBridge) {
                             window.AndroidBridge.onStateChange(event.data);
                         }
@@ -379,7 +401,7 @@ class StreamPlayerManager(private val context: Context) {
                                 }
                             } catch(e) {}
                         }
-                    }, 250);
+                    }, 800);
                 </script>
             </body>
             </html>

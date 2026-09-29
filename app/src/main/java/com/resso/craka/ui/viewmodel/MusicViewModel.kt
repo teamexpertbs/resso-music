@@ -128,13 +128,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleVideoMode() {
         _isVideoMode.value = !_isVideoMode.value
+        streamPlayerManager.setHighQuality(_isVideoMode.value)
     }
 
     fun setVideoMode(enabled: Boolean) {
         _isVideoMode.value = enabled
+        streamPlayerManager.setHighQuality(enabled)
     }
 
-    private val _isLyricsVisible = MutableStateFlow(true)
+    private val _isLyricsVisible = MutableStateFlow(false)
     val isLyricsVisible: StateFlow<Boolean> = _isLyricsVisible.asStateFlow()
 
     fun toggleLyrics() {
@@ -327,15 +329,18 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun loadTrendingSongs() {
+        val cached = repository.peekTrending()
+        if (cached.isNotEmpty()) {
+            _trendingSongs.value = cached
+            if (playbackQueue.value.isEmpty()) playbackQueue.value = cached
+        }
         viewModelScope.launch {
             try {
                 val trending = repository.getTrendingSongs()
                 if (trending.isEmpty()) return@launch
                 _trendingSongs.value = trending
-                playbackQueue.value = trending
-                val current = _currentSong.value
-                if (current == null || needsRealLyrics(current.lyricsLrc)) {
-                    selectSong(trending.first(), 0, autoPlay = false, queue = trending)
+                if (playbackQueue.value.isEmpty() || playbackQueue.value.map { it.id } == cached.map { it.id }) {
+                    playbackQueue.value = trending
                 }
             } catch (e: Exception) {
                 Log.w("MusicViewModel", "Error loading trending: ${e.message}")
@@ -407,11 +412,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val indexToUse = if (existingIndex >= 0) existingIndex else allCurrent.size
 
             selectSong(song, indexToUse, autoPlay = autoPlay)
-
-            // Fetch synced lyrics if not already present
-            if (song.lyricsLrc.isBlank()) {
-                fetchAndApplyLyrics(song)
-            }
         }
     }
 

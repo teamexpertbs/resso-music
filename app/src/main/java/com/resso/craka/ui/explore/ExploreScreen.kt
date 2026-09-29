@@ -98,7 +98,7 @@ fun ExploreScreen(
     // Debounced automatic search while typing
     LaunchedEffect(searchKeyword) {
         if (searchKeyword.isNotBlank()) {
-            delay(350)
+            delay(700)
             viewModel.searchMusic(searchKeyword)
         }
     }
@@ -150,15 +150,10 @@ fun ExploreScreen(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Explore",
+                    text = "Search",
                     style = MaterialTheme.typography.headlineMedium,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
-                )
-                Text(
-                    text = "Find the next song you love",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = RessoTextSecondary
                 )
             }
 

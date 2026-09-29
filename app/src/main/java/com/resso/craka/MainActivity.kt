@@ -229,7 +229,7 @@ class MainActivity : ComponentActivity() {
                                             },
                                             label = {
                                                 Text(
-                                                    "Explore",
+                                                    "Search",
                                                     color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
                                                     fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
                                                 )

@@ -7,6 +7,7 @@ import com.resso.craka.data.model.CommentEntity
 import com.resso.craka.data.model.PlaylistEntity
 import com.resso.craka.data.model.SongEntity
 import com.resso.craka.data.model.VibeEntity
+import com.resso.craka.data.network.CatalogCache
 import com.resso.craka.data.network.MusicSearchService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,6 +26,7 @@ class MusicRepository(context: Context) {
     val commentDao = db.commentDao()
     val playlistDao = db.playlistDao()
     val searchService = MusicSearchService()
+    private val catalogCache = CatalogCache(context)
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
@@ -41,8 +43,22 @@ class MusicRepository(context: Context) {
     suspend fun updateSongVibe(songId: String, vibeUri: String) = songDao.updateSongVibe(songId, vibeUri)
 
     // Online & Local Search
-    suspend fun searchSongsOnline(query: String): List<SongEntity> = searchService.searchSongs(query)
-    suspend fun getTrendingSongs(): List<SongEntity> = searchService.getTrendingSongs()
+    suspend fun searchSongsOnline(query: String): List<SongEntity> {
+        val key = "search_${query.trim().lowercase()}"
+        catalogCache.read(key, SEARCH_CACHE_MS)?.let { return it }
+        val fresh = searchService.searchSongs(query)
+        if (fresh.isNotEmpty()) catalogCache.write(key, fresh)
+        return fresh.ifEmpty { catalogCache.read(key, WEEK_MS).orEmpty() }
+    }
+
+    suspend fun getTrendingSongs(): List<SongEntity> {
+        catalogCache.read(TRENDING_KEY, TRENDING_CACHE_MS)?.let { return it }
+        val fresh = searchService.getTrendingSongs()
+        if (fresh.isNotEmpty()) catalogCache.write(TRENDING_KEY, fresh)
+        return fresh.ifEmpty { catalogCache.read(TRENDING_KEY, WEEK_MS).orEmpty() }
+    }
+
+    fun peekTrending(): List<SongEntity> = catalogCache.read(TRENDING_KEY, WEEK_MS).orEmpty()
     suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
     suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
     suspend fun updateSongLyrics(songId: String, lyrics: String) = songDao.updateSongLyrics(songId, lyrics)
@@ -64,6 +80,13 @@ class MusicRepository(context: Context) {
         return playlistDao.insertPlaylist(
             PlaylistEntity(name = name, description = description, songIdsCsv = "")
         )
+    }
+
+    companion object {
+        private const val TRENDING_KEY = "trending"
+        private const val TRENDING_CACHE_MS = 12 * 60 * 60 * 1000L
+        private const val SEARCH_CACHE_MS = 12 * 60 * 60 * 1000L
+        private const val WEEK_MS = 7 * 24 * 60 * 60 * 1000L
     }
 
     private suspend fun seedInitialDataIfEmpty() {

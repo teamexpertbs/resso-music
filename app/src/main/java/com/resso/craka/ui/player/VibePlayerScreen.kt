@@ -21,12 +21,14 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -233,22 +235,22 @@ fun VibePlayerScreen(
             }
             .testTag("vibe_player_screen")
     ) {
-        // 1. Dynamic Video / Ambient Vibe Background or Official MV Scrim
-        if (isVideoMode && currentSong?.id?.startsWith("yt_") == true) {
+        val showMusicVideo = isVideoMode && currentSong?.id?.startsWith("yt_") == true
+        if (showMusicVideo) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .background(
                         Brush.verticalGradient(
                             colors = listOf(
-                                Color.Black.copy(alpha = 0.15f),
+                                Color.Black.copy(alpha = 0.28f),
                                 Color.Transparent,
-                                Color.Black.copy(alpha = 0.72f)
+                                Color.Black.copy(alpha = 0.82f)
                             )
                         )
                     )
             )
-        } else {
+        } else if (!currentVibeUri.isNullOrBlank()) {
             VideoBackground(
                 videoUri = currentVibeUri,
                 filterType = currentVibeFilter,
@@ -256,158 +258,39 @@ fun VibePlayerScreen(
             )
         }
 
-        val showMusicVideo = isVideoMode && currentSong?.id?.startsWith("yt_") == true
-        if (!showMusicVideo) {
-            Column(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(start = 28.dp, end = 78.dp, bottom = 36.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                AlbumArtwork(
-                    songId = currentSong?.id,
-                    albumArtUrl = currentSong?.albumArtUrl,
-                    contentDescription = currentSong?.title ?: "Song thumbnail",
-                    modifier = Modifier
-                        .size(if (isLyricsVisible && lyrics.isNotEmpty()) 148.dp else 232.dp)
-                        .clip(RoundedCornerShape(18.dp))
-                        .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(18.dp))
-                        .testTag("player_album_art")
-                )
-                if (isLyricsVisible) {
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(if (lyrics.isNotEmpty()) 132.dp else 36.dp)
-                            .testTag("lyrics_compact_container")
-                    ) {
-                        if (lyrics.isNotEmpty()) {
-                            LazyColumn(
-                                state = listState,
-                                modifier = Modifier.fillMaxSize(),
-                                contentPadding = PaddingValues(vertical = 2.dp)
-                            ) {
-                                itemsIndexed(lyrics) { index, lyric ->
-                                    val isActive = index == activeLyricIndex
-                                    val isPast = index < activeLyricIndex
-                                    Text(
-                                        text = lyric.text,
-                                        fontSize = if (isActive) 18.sp else 14.sp,
-                                        fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                                        color = when {
-                                            isActive -> Color.White
-                                            isPast -> Color.White.copy(alpha = 0.42f)
-                                            else -> Color.White.copy(alpha = 0.28f)
-                                        },
-                                        maxLines = 2,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .padding(vertical = 3.dp)
-                                            .clickable { viewModel.seekTo(lyric.timeMs) }
-                                            .testTag("lyric_line_$index")
-                                    )
-                                }
-                            }
-                        } else {
-                            Text(
-                                text = lyricsStatus.ifBlank { "Lyrics not available for this song" },
-                                color = Color.White.copy(alpha = 0.75f),
-                                fontSize = 13.sp,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
-            }
-        } else if (isLyricsVisible) {
-            Box(
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .fillMaxWidth()
-                    .padding(start = 20.dp, end = 78.dp, bottom = 80.dp)
-                    .height(180.dp)
-                    .testTag("lyrics_compact_container")
-            ) {
-                if (lyrics.isNotEmpty()) {
-                    LazyColumn(state = listState, modifier = Modifier.fillMaxSize()) {
-                        itemsIndexed(lyrics) { index, lyric ->
-                            val isActive = index == activeLyricIndex
-                            Text(
-                                text = lyric.text,
-                                fontSize = if (isActive) 20.sp else 15.sp,
-                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.4f),
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 3.dp)
-                                    .clickable { viewModel.seekTo(lyric.timeMs) }
-                                    .testTag("lyric_line_$index")
-                            )
-                        }
-                    }
-                }
-            }
-        }
-
-        // 3. Top Header: Sidebar Menu, Song Info / Mood Tag & Quick Search
-        Row(
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
+                .fillMaxSize()
                 .statusBarsPadding()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
+                .padding(horizontal = 16.dp)
         ) {
             Row(
-                modifier = Modifier.weight(1f),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
                     onClick = onOpenSidebar,
                     modifier = Modifier
-                        .size(38.dp)
-                        .clip(CircleShape)
-                        .background(Color.Black.copy(alpha = 0.5f))
+                        .size(36.dp)
                         .testTag("open_sidebar_button")
                 ) {
                     Icon(
                         imageVector = Icons.Default.Menu,
-                        contentDescription = "Open Sidebar Menu",
-                        tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        contentDescription = "Open menu",
+                        tint = Color.White
                     )
                 }
-
-                Spacer(modifier = Modifier.width(10.dp))
-
-                Column(modifier = Modifier.weight(1f)) {
-                     Text(
-                         text = "resso",
-                         fontSize = 20.sp,
-                         fontWeight = FontWeight.ExtraBold,
-                         color = Color.White,
-                         letterSpacing = (-0.4).sp,
-                         maxLines = 1
-                     )
-                    Text(
-                         text = "${currentSong?.mood ?: "Chill"} · ${currentSong?.genre ?: "Pop"}",
-                        fontSize = 11.sp,
-                        color = Color.White.copy(alpha = 0.7f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            // Compact controls keep the header usable on narrow Android screens.
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+                Text(
+                    text = "resso",
+                    modifier = Modifier.weight(1f),
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.ExtraBold,
+                    color = Color.White,
+                    letterSpacing = (-0.8).sp,
+                    textAlign = TextAlign.Center
+                )
                 if (currentSong?.id?.startsWith("yt_") == true) {
                     PlayerTopActionButton(
                         icon = Icons.Default.MusicVideo,
@@ -417,32 +300,218 @@ fun VibePlayerScreen(
                         onClick = { viewModel.toggleVideoMode() }
                     )
                 }
-
-                PlayerTopActionButton(
-                    icon = Icons.Default.FormatQuote,
-                    contentDescription = if (isLyricsVisible) "Hide lyrics" else "Show lyrics",
-                    selected = isLyricsVisible,
-                    tag = "toggle_lyrics_chip",
-                    onClick = { viewModel.toggleLyrics() }
-                )
                 PlayerTopActionButton(
                     icon = Icons.Default.Search,
                     contentDescription = "Search songs",
                     selected = false,
-                    tint = RessoSecondary,
+                    tint = Color.White,
                     tag = "top_search_songs_chip",
                     onClick = onNavigateToSearch
                 )
             }
+
+            if (!showMusicVideo && !isLyricsVisible) {
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(horizontal = 36.dp, vertical = 12.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AlbumArtwork(
+                        songId = currentSong?.id,
+                        albumArtUrl = currentSong?.albumArtUrl,
+                        contentDescription = currentSong?.title ?: "Song cover",
+                        modifier = Modifier
+                            .fillMaxHeight()
+                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
+                            .clip(RoundedCornerShape(8.dp))
+                            .testTag("player_album_art")
+                    )
+                }
+                Text(
+                    text = currentSong?.title ?: "Pick a song",
+                    color = Color.White,
+                    fontSize = 22.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text(
+                    text = currentSong?.artist ?: "",
+                    color = RessoTextSecondary,
+                    fontSize = 15.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp)
+                )
+                val lyricLine = lyrics.getOrNull(activeLyricIndex)?.text
+                    ?: lyricsStatus.ifBlank { "Lyrics" }
+                Text(
+                    text = lyricLine,
+                    color = Color.White.copy(alpha = 0.92f),
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 2,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 14.dp, start = 12.dp, end = 12.dp)
+                        .clickable { viewModel.toggleLyrics() }
+                        .testTag("toggle_lyrics_chip")
+                )
+            } else if (isLyricsVisible && !showMusicVideo) {
+                Text(
+                    text = currentSong?.title ?: "",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 16.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(top = 8.dp, end = 56.dp)
+                )
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, end = 56.dp)
+                        .testTag("lyrics_compact_container")
+                ) {
+                    if (lyrics.isEmpty()) {
+                        item {
+                            Text(
+                                text = lyricsStatus.ifBlank { "Lyrics not available for this song" },
+                                color = RessoTextSecondary,
+                                modifier = Modifier.padding(top = 24.dp)
+                            )
+                        }
+                    }
+                    itemsIndexed(lyrics) { index, lyric ->
+                        val isActive = index == activeLyricIndex
+                        Text(
+                            text = lyric.text,
+                            fontSize = if (isActive) 22.sp else 16.sp,
+                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
+                            color = if (isActive) Color.White else Color.White.copy(alpha = 0.38f),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 8.dp)
+                                .clickable { viewModel.seekTo(lyric.timeMs) }
+                                .testTag("lyric_line_$index")
+                        )
+                    }
+                }
+            } else {
+                Spacer(modifier = Modifier.weight(1f))
+                if (showMusicVideo) {
+                    Text(
+                        text = currentSong?.title ?: "",
+                        color = Color.White,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 20.sp,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = currentSong?.artist ?: "",
+                        color = Color.White.copy(alpha = 0.75f),
+                        fontSize = 14.sp,
+                        maxLines = 1
+                    )
+                }
+            }
+
+            var isUserSeeking by remember { mutableStateOf(false) }
+            var seekValue by remember { mutableFloatStateOf(0f) }
+            val progress = if (isUserSeeking) seekValue else {
+                if (duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
+            }
+            Slider(
+                value = progress,
+                onValueChange = {
+                    isUserSeeking = true
+                    seekValue = it
+                },
+                onValueChangeFinished = {
+                    viewModel.seekTo((seekValue * duration).toLong())
+                    isUserSeeking = false
+                },
+                colors = SliderDefaults.colors(
+                    thumbColor = Color.White,
+                    activeTrackColor = RessoPrimary,
+                    inactiveTrackColor = Color.White.copy(alpha = 0.18f)
+                ),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(28.dp)
+                    .testTag("playback_progress_slider")
+            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Text(text = LyricsParser.formatTime(currentPos), color = RessoTextSecondary, fontSize = 11.sp)
+                Text(text = LyricsParser.formatTime(duration), color = RessoTextSecondary, fontSize = 11.sp)
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 2.dp, bottom = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                IconButton(onClick = { viewModel.toggleShuffle() }, modifier = Modifier.testTag("toggle_shuffle_button")) {
+                    Icon(
+                        imageVector = Icons.Default.Shuffle,
+                        contentDescription = "Shuffle",
+                        tint = if (isShuffle) RessoPrimary else Color.White.copy(alpha = 0.7f)
+                    )
+                }
+                IconButton(onClick = { viewModel.playPreviousSong() }, modifier = Modifier.testTag("play_previous_button")) {
+                    Icon(Icons.Default.SkipPrevious, contentDescription = "Previous", tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+                Box(
+                    modifier = Modifier
+                        .size(64.dp)
+                        .clip(CircleShape)
+                        .background(Color.White)
+                        .clickable { viewModel.togglePlayPause() }
+                        .testTag("play_pause_button"),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                        contentDescription = if (isPlaying) "Pause" else "Play",
+                        tint = Color.Black,
+                        modifier = Modifier.size(36.dp)
+                    )
+                }
+                IconButton(onClick = { viewModel.playNextSong() }, modifier = Modifier.testTag("play_next_button")) {
+                    Icon(Icons.Default.SkipNext, contentDescription = "Next", tint = Color.White, modifier = Modifier.size(36.dp))
+                }
+                IconButton(onClick = { viewModel.toggleRepeat() }, modifier = Modifier.testTag("toggle_repeat_button")) {
+                    Icon(
+                        imageVector = if (repeatMode == 2) Icons.Default.RepeatOne else Icons.Default.Repeat,
+                        contentDescription = "Repeat",
+                        tint = if (repeatMode > 0) RessoPrimary else Color.White.copy(alpha = 0.7f)
+                    )
+                }
+            }
         }
 
-        // 4. Right Side Action Bar
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 6.dp),
+                .padding(end = 8.dp, bottom = 72.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             // Heart / Like Button
             PlayerActionButton(
@@ -481,11 +550,11 @@ fun VibePlayerScreen(
             )
 
             PlayerActionButton(
-                icon = Icons.Default.AutoAwesome,
-                label = "Vibe",
-                tint = Color.White,
+                icon = Icons.Default.FormatQuote,
+                label = "Lyrics",
+                tint = if (isLyricsVisible) RessoPrimary else Color.White,
                 tag = "player_lyric_poster_button",
-                onClick = onOpenVibeCreator
+                onClick = { viewModel.toggleLyrics() }
             )
         }
 
@@ -502,194 +571,6 @@ fun VibePlayerScreen(
             )
         }
 
-        // 6. Bottom Playback Controls Strip
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        colors = listOf(
-                            Color.Transparent,
-                            Color.Black.copy(alpha = 0.38f),
-                            Color.Black.copy(alpha = 0.94f)
-                        )
-                    )
-                )
-                .padding(start = 16.dp, end = 8.dp, top = 8.dp, bottom = 4.dp)
-        ) {
-            // Track Info & Artist
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                AlbumArtwork(
-                    songId = currentSong?.id,
-                    albumArtUrl = currentSong?.albumArtUrl,
-                    contentDescription = currentSong?.title,
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(8.dp))
-                        .testTag("player_now_playing_thumb")
-                )
-                Spacer(modifier = Modifier.width(10.dp))
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = currentSong?.title ?: "Select a Track",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = listOfNotNull(
-                                currentSong?.artist,
-                                currentSong?.album?.takeIf { it.isNotBlank() && it != "Official Stream" }
-                            ).joinToString(" · ").ifBlank { "Resso" },
-                            style = MaterialTheme.typography.bodySmall,
-                            color = RessoTextSecondary,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f, fill = false)
-                        )
-                        if (currentSong?.id?.startsWith("yt_") == true) {
-                            Spacer(modifier = Modifier.width(6.dp))
-                            Text(
-                                text = "• HD Stream",
-                                color = Color(0xFFFF4D4D),
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-            }
-
-            Spacer(modifier = Modifier.height(4.dp))
-
-            // Seekable Progress Bar
-            var isUserSeeking by remember { mutableStateOf(false) }
-            var seekValue by remember { mutableFloatStateOf(0f) }
-
-            val progress = if (isUserSeeking) seekValue else {
-                if (duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-            }
-
-            Slider(
-                value = progress,
-                onValueChange = {
-                    isUserSeeking = true
-                    seekValue = it
-                },
-                onValueChangeFinished = {
-                    val targetMs = (seekValue * duration).toLong()
-                    viewModel.seekTo(targetMs)
-                    isUserSeeking = false
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = RessoPrimary,
-                    activeTrackColor = RessoPrimary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.2f)
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(32.dp)
-                    .testTag("playback_progress_slider")
-            )
-
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(
-                    text = LyricsParser.formatTime(currentPos),
-                    color = RessoTextSecondary,
-                    fontSize = 11.sp
-                )
-                Text(
-                    text = LyricsParser.formatTime(duration),
-                    color = RessoTextSecondary,
-                    fontSize = 11.sp
-                )
-            }
-
-            // Buttons: Shuffle, Prev, Play/Pause, Next, Repeat
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                horizontalArrangement = Arrangement.SpaceEvenly,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                IconButton(
-                    onClick = { viewModel.toggleShuffle() },
-                    modifier = Modifier.testTag("toggle_shuffle_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Shuffle,
-                        contentDescription = "Shuffle",
-                        tint = if (isShuffle) RessoSecondary else Color.White.copy(alpha = 0.6f)
-                    )
-                }
-
-                IconButton(
-                    onClick = { viewModel.playPreviousSong() },
-                    modifier = Modifier.testTag("play_previous_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipPrevious,
-                        contentDescription = "Previous Song",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                // Play / Pause FAB
-                Box(
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
-                        .background(RessoPrimary)
-                        .clickable { viewModel.togglePlayPause() }
-                        .testTag("play_pause_button"),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                        contentDescription = if (isPlaying) "Pause" else "Play",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = { viewModel.playNextSong() },
-                    modifier = Modifier.testTag("play_next_button")
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.SkipNext,
-                        contentDescription = "Next Song",
-                        tint = Color.White,
-                        modifier = Modifier.size(32.dp)
-                    )
-                }
-
-                IconButton(
-                    onClick = { viewModel.toggleRepeat() },
-                    modifier = Modifier.testTag("toggle_repeat_button")
-                ) {
-                    Icon(
-                        imageVector = if (repeatMode == 2) Icons.Default.RepeatOne else Icons.Default.Repeat,
-                        contentDescription = "Repeat",
-                        tint = if (repeatMode > 0) RessoSecondary else Color.White.copy(alpha = 0.6f)
-                    )
-                }
-            }
-        }
     }
 }
 
