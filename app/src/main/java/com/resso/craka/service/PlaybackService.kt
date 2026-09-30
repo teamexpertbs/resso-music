@@ -110,6 +110,7 @@ class PlaybackService : Service() {
         stopForeground(STOP_FOREGROUND_REMOVE)
         mediaSession.isActive = false
         mediaSession.release()
+        markStopped()
         super.onDestroy()
     }
 
@@ -279,6 +280,9 @@ class PlaybackService : Service() {
 
         val commands = PlaybackCommands()
 
+        @Volatile
+        private var started = false
+
         fun update(
             context: Context,
             title: String,
@@ -288,6 +292,8 @@ class PlaybackService : Service() {
             songId: String = "",
             positionMs: Long = 0L
         ) {
+            if (!playing && !started) return
+            started = true
             val intent = Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_UPDATE
                 putExtra(EXTRA_TITLE, title)
@@ -301,7 +307,12 @@ class PlaybackService : Service() {
         }
 
         fun stop(context: Context) {
+            started = false
             context.stopService(Intent(context, PlaybackService::class.java))
+        }
+
+        internal fun markStopped() {
+            started = false
         }
     }
 }

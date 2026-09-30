@@ -5,7 +5,6 @@ import android.content.Context
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.net.Uri
 import android.util.Log
 import androidx.lifecycle.AndroidViewModel
@@ -243,14 +242,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         loadTrendingSongs()
         loadHomeRows()
         setupNetworkConnectivityListener()
-
-        viewModelScope.launch {
-            allSongs.collect { songs ->
-                if (songs.isNotEmpty() && _currentSong.value == null) {
-                    selectSong(songs[0], 0, autoPlay = false)
-                }
-            }
-        }
     }
 
     private fun setupNetworkConnectivityListener() {
@@ -259,40 +250,39 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             connectivityManager = cm
             val callback = object : ConnectivityManager.NetworkCallback() {
                 override fun onLost(network: Network) {
-                    if (_isPlaying.value) {
+                    if (!_isPlaying.value) return
+                    val position = _currentPositionMs.value
+                    viewModelScope.launch {
+                        delay(400)
+                        if (hasInternet() || !_isPlaying.value) return@launch
                         wasPlayingBeforeNetworkLost = true
-                        savedPositionBeforeLost = _currentPositionMs.value
+                        savedPositionBeforeLost = position
                         _networkStatusMessage.value = "⚠️ Internet कट गया! कनेक्शन आते ही गाना वहीं से चालू होगा 📡"
                     }
                 }
 
                 override fun onAvailable(network: Network) {
-                    if (wasPlayingBeforeNetworkLost) {
+                    if (!wasPlayingBeforeNetworkLost) return
+                    viewModelScope.launch {
+                        delay(600)
+                        if (!wasPlayingBeforeNetworkLost || !hasInternet()) return@launch
                         wasPlayingBeforeNetworkLost = false
-                        viewModelScope.launch {
-                            delay(600) // Brief delay for stable network buffer
-                            _networkStatusMessage.value = "⚡ Internet वापस आ गया! गाना वहीं से जारी हो रहा है..."
-                            val song = _currentSong.value
-                            if (song != null) {
-                                if (song.id.startsWith("yt_")) {
-                                    streamPlayerManager.seekTo(savedPositionBeforeLost)
-                                    streamPlayerManager.play()
-                                    _isPlaying.value = true
-                                } else {
-                                    player.seekTo(savedPositionBeforeLost)
-                                    player.play()
-                                    _isPlaying.value = true
-                                }
-                            }
+                        val song = _currentSong.value ?: return@launch
+                        _networkStatusMessage.value = "⚡ Internet वापस आ गया! गाना वहीं से जारी हो रहा है..."
+                        if (song.id.startsWith("yt_")) {
+                            startYoutube(song, autoPlay = true)
+                            streamPlayerManager.seekTo(savedPositionBeforeLost)
+                        } else {
+                            player.seekTo(savedPositionBeforeLost)
+                            player.play()
+                            _isPlaying.value = true
                         }
+                        publishPlayback(true)
                     }
                 }
             }
             networkCallback = callback
-            val request = NetworkRequest.Builder()
-                .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .build()
-            cm?.registerNetworkCallback(request, callback)
+            cm?.registerDefaultNetworkCallback(callback)
         } catch (e: Exception) {
             Log.w("MusicViewModel", "Network listener init: ${e.message}")
         }
@@ -431,7 +421,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 _searchResults.value = combined
-                if (combined.isNotEmpty()) rememberSearch(trimmed)
+                if (combined.isNotEmpty()) {
+                    rememberSearch(trimmed)
+                    _homeRows.value = buildHomeRows(allSongs.value)
+                }
                 if (combined.isEmpty()) {
                     _searchError.value = "No songs found for '$trimmed'"
                 }
@@ -572,17 +565,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         observeCommentsForSong(song.id)
 
         if (song.id.startsWith("yt_")) {
-            if (player.isPlaying) {
-                player.stop()
-            }
-            _streamVisible.value = true
-            val videoId = song.id.removePrefix("yt_")
-            streamPlayerManager.loadAndPlay(videoId, autoPlay)
-            if (_isVolumeBoosterEnabled.value) streamPlayerManager.setBoost(true)
-            applyEqualizer()
-            _isPlaying.value = autoPlay
+            startYoutube(song, autoPlay)
         } else {
             // Standard media: pause Stream, play via ExoPlayer
+            streamPlayerManager.setKeepPlayingInBackground(false)
             streamPlayerManager.pause()
             _isVideoMode.value = false
             try {
@@ -603,7 +589,36 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (needsRealLyrics(song.lyricsLrc)) {
             fetchAndApplyLyrics(song)
         }
+        applyEqualizer()
         publishPlayback(autoPlay)
+    }
+
+    private fun startYoutube(song: SongEntity, autoPlay: Boolean) {
+        if (player.isPlaying) player.stop()
+        val videoId = song.id.removePrefix("yt_")
+        if (!autoPlay) {
+            streamPlayerManager.setKeepPlayingInBackground(false)
+            streamPlayerManager.pause()
+            _isPlaying.value = false
+            return
+        }
+        _streamVisible.value = true
+        if (streamPlayerManager.activeVideoId() == videoId && streamPlayerManager.hasWebView()) {
+            streamPlayerManager.setKeepPlayingInBackground(true)
+            streamPlayerManager.play()
+        } else {
+            streamPlayerManager.loadAndPlay(videoId, true)
+        }
+        if (_isVolumeBoosterEnabled.value) streamPlayerManager.setBoost(true)
+        _isPlaying.value = true
+    }
+
+    private fun hasInternet(): Boolean {
+        val cm = connectivityManager ?: return false
+        val network = cm.activeNetwork ?: return false
+        val caps = cm.getNetworkCapabilities(network) ?: return false
+        return caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
     }
 
     private fun publishPlayback(playing: Boolean = _isPlaying.value) {
@@ -624,11 +639,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resumePlayback() {
         val song = _currentSong.value ?: return
-        if (_isPlaying.value) return
         if (song.id.startsWith("yt_")) {
-            streamPlayerManager.play()
-            _isPlaying.value = true
-        } else {
+            startYoutube(song, autoPlay = true)
+        } else if (!player.isPlaying) {
             player.play()
             _isPlaying.value = true
         }
@@ -637,7 +650,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun pausePlayback() {
         val song = _currentSong.value ?: return
-        if (!_isPlaying.value) return
+        wasPlayingBeforeNetworkLost = false
         if (song.id.startsWith("yt_")) {
             streamPlayerManager.setKeepPlayingInBackground(false)
             streamPlayerManager.pause()
@@ -660,7 +673,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun togglePlayPause() {
         val song = _currentSong.value ?: return
         if (song.id.startsWith("yt_")) {
-            if (_isPlaying.value) pausePlayback() else resumePlayback()
+            val playing = _isPlaying.value || streamPlayerManager.isPlaying.value
+            if (playing) pausePlayback() else resumePlayback()
             return
         } else if (player.isPlaying) {
             player.pause()
@@ -895,6 +909,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun removeFromQueue(songId: String) {
         val wasCurrent = _currentSong.value?.id == songId
+        val keepPlaying = wasCurrent && _isPlaying.value
         val remaining = playbackQueue.value.filter { it.id != songId }
         playbackQueue.value = remaining
         if (!wasCurrent) return
@@ -903,7 +918,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             pausePlayback()
             return
         }
-        selectSong(next, 0, autoPlay = true, queue = remaining)
+        selectSong(next, 0, autoPlay = keepPlaying, queue = remaining)
     }
 
     fun moveInQueue(index: Int, direction: Int) {
@@ -916,8 +931,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun addToQueue(song: SongEntity) {
-        if (playbackQueue.value.any { it.id == song.id }) return
+        if (playbackQueue.value.any { it.id == song.id }) {
+            _networkStatusMessage.value = "Already in the queue"
+            return
+        }
         playbackQueue.value = playbackQueue.value + song
+        _networkStatusMessage.value = "Added to queue"
     }
 
     fun startSleepTimer(minutes: Int) {
@@ -945,19 +964,29 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             appEqualizer.release()
             return
         }
+        val song = _currentSong.value
+        if (song?.id?.startsWith("yt_") == true) {
+            appEqualizer.release()
+            _networkStatusMessage.value = "Equalizer works on saved audio. YouTube playback is left alone."
+            return
+        }
         applyEqualizer()
     }
 
     private fun applyEqualizer() {
         val preset = _equalizerPreset.value
-        if (preset == "Off") return
-        val song = _currentSong.value
-        val session = if (song?.id?.startsWith("yt_") == true) {
-            0
-        } else {
-            player.audioSessionId
+        if (preset == "Off") {
+            appEqualizer.release()
+            return
         }
-        appEqualizer.attach(if (session == C.AUDIO_SESSION_ID_UNSET) 0 else session)
+        val song = _currentSong.value
+        if (song == null || song.id.startsWith("yt_")) {
+            appEqualizer.release()
+            return
+        }
+        val session = player.audioSessionId
+        if (session == C.AUDIO_SESSION_ID_UNSET) return
+        appEqualizer.attach(session)
         appEqualizer.apply(preset)
     }
 
@@ -993,16 +1022,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun loadHomeRows() {
         viewModelScope.launch {
-            val queries = listOf(
-                "Romantic" to "Romantic Hindi Songs",
-                "Punjabi" to "Punjabi Hits",
-                "Arijit Singh" to "Arijit Singh"
-            )
-            val rows = queries.mapNotNull { (title, query) ->
-                val songs = repository.peekSearch(query).take(8)
-                if (songs.isEmpty()) null else title to songs
+            allSongs.collect { local ->
+                _homeRows.value = buildHomeRows(local)
             }
-            _homeRows.value = rows
+        }
+    }
+
+    private fun buildHomeRows(local: List<SongEntity>): List<Pair<String, List<SongEntity>>> {
+        val specs = listOf(
+            Triple("Romantic", listOf("Romantic Hits", "Romantic Hindi Songs", "Romantic"), listOf("romance", "romantic", "soulful", "heartfelt")),
+            Triple("Punjabi", listOf("Punjabi Beats", "Punjabi Hits", "Punjabi"), listOf("punjabi")),
+            Triple("Arijit Singh", listOf("Arijit Singh"), listOf("arijit"))
+        )
+        return specs.mapNotNull { (title, queries, needles) ->
+            val cached = repository.peekSearches(queries)
+            val fromLibrary = local.filter { song ->
+                val blob = "${song.title} ${song.artist} ${song.album} ${song.genre} ${song.mood}".lowercase()
+                needles.any { blob.contains(it) }
+            }
+            val songs = (cached + fromLibrary).distinctBy { it.id }.take(8)
+            if (songs.isEmpty()) null else title to songs
         }
     }
 

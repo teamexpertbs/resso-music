@@ -34,9 +34,17 @@ class AppEqualizer {
                 "Treble" -> if (band >= bands * 2 / 3) max / 2 else min / 5
                 else -> 0
             }
-            eq.setBandLevel(band.toShort(), level.coerceIn(min, max).toShort())
+            try {
+                eq.setBandLevel(band.toShort(), level.coerceIn(min, max).toShort())
+            } catch (e: Exception) {
+                Log.w(TAG, "Band $band skipped: ${e.message}")
+            }
         }
-        eq.enabled = preset != "Off"
+        try {
+            eq.enabled = preset != "Off"
+        } catch (e: Exception) {
+            Log.w(TAG, "Equalizer enable failed: ${e.message}")
+        }
     }
 
     fun release() {

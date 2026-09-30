@@ -42,6 +42,8 @@ class StreamPlayerManager(private val context: Context) {
 
     fun hasWebView(): Boolean = webView != null
 
+    fun activeVideoId(): String? = currentVideoId
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
         if (webView != null) return
@@ -181,6 +183,7 @@ class StreamPlayerManager(private val context: Context) {
     }
 
     fun play() {
+        _isPlaying.value = true
         mainHandler.post {
             webView?.onResume()
             webView?.resumeTimers()
@@ -189,6 +192,7 @@ class StreamPlayerManager(private val context: Context) {
     }
 
     fun pause() {
+        _isPlaying.value = false
         mainHandler.post {
             webView?.evaluateJavascript("window.shouldResume = false; if (player && player.pauseVideo) { player.pauseVideo(); }", null)
         }

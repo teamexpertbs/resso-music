@@ -19,7 +19,7 @@ class MusicRepository(context: Context) {
         context.applicationContext,
         AppDatabase::class.java,
         "resso_music.db"
-    ).fallbackToDestructiveMigration(true).build()
+    ).build()
 
     val songDao = db.songDao()
     val vibeDao = db.vibeDao()
@@ -63,6 +63,14 @@ class MusicRepository(context: Context) {
     fun peekSearch(query: String): List<SongEntity> {
         val key = "search_${query.trim().lowercase()}"
         return catalogCache.read(key, WEEK_MS).orEmpty()
+    }
+
+    fun peekSearches(queries: List<String>): List<SongEntity> {
+        val merged = LinkedHashMap<String, SongEntity>()
+        queries.forEach { query ->
+            peekSearch(query).forEach { song -> merged.putIfAbsent(song.id, song) }
+        }
+        return merged.values.toList()
     }
     suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
     suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
