@@ -98,7 +98,8 @@ fun LibraryScreen(
     var isNewPlaylistDialogOpen by remember { mutableStateOf(false) }
     var newPlaylistTitle by remember { mutableStateOf("") }
 
-    val tabTitles = listOf("Liked", "Vibes", "Playlists", "Uploads")
+    val recentSongs by viewModel.recentSongs.collectAsState()
+    val tabTitles = listOf("Liked", "Recent", "Playlists", "Uploads", "Vibes")
 
     Column(
         modifier = modifier
@@ -221,6 +222,29 @@ fun LibraryScreen(
                 }
             }
             1 -> {
+                if (recentSongs.isEmpty()) {
+                    EmptyStateBox(
+                        title = "No recent songs",
+                        subtitle = "Songs you play will show up here.",
+                        icon = Icons.Default.MusicNote
+                    )
+                } else {
+                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        itemsIndexed(recentSongs, key = { _, s -> s.id }) { index, song ->
+                            SongListItem(
+                                song = song,
+                                isPlayingThis = false,
+                                onPlay = {
+                                    viewModel.selectSong(song, index, autoPlay = true, queue = recentSongs)
+                                    onSongSelected()
+                                },
+                                onToggleLike = { viewModel.toggleLikeSong(song) }
+                            )
+                        }
+                    }
+                }
+            }
+            4 -> {
                 // Created Vibes (from Room database)
                 if (allVibes.isEmpty()) {
                     Box(
@@ -320,17 +344,30 @@ fun LibraryScreen(
                                         .padding(14.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(46.dp)
-                                            .clip(RoundedCornerShape(8.dp))
-                                            .background(RessoPrimary),
-                                        contentAlignment = Alignment.Center
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Default.PlaylistPlay,
-                                            contentDescription = null,
-                                            tint = Color.White
+                                    val coverId = playlist.songIdsCsv.split(",").firstOrNull { it.isNotBlank() }
+                                    val cover = allSongs.firstOrNull { it.id == coverId }?.albumArtUrl
+                                    if (cover.isNullOrBlank()) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(RessoPrimary),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.PlaylistPlay,
+                                                contentDescription = null,
+                                                tint = Color.White
+                                            )
+                                        }
+                                    } else {
+                                        com.resso.craka.ui.components.AlbumArtwork(
+                                            songId = coverId,
+                                            albumArtUrl = cover,
+                                            contentDescription = playlist.name,
+                                            modifier = Modifier
+                                                .size(46.dp)
+                                                .clip(RoundedCornerShape(8.dp))
                                         )
                                     }
                                     Spacer(modifier = Modifier.width(12.dp))
@@ -456,20 +493,25 @@ fun LibraryScreen(
                     Text("This playlist is empty. Use + on the playlist to add the song that is playing.", color = RessoTextSecondary)
                 } else {
                     Column {
-                        openPlaylistSongs.forEach { song ->
-                            Text(
-                                text = "${song.title} · ${song.artist}",
-                                color = Color.White,
-                                fontSize = 14.sp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clickable {
-                                        viewModel.selectSong(song, 0, autoPlay = true, queue = openPlaylistSongs)
-                                        openPlaylist = null
-                                        onSongSelected()
-                                    }
-                                    .padding(vertical = 8.dp)
-                            )
+                        openPlaylistSongs.forEachIndexed { index, song ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(
+                                    text = song.title,
+                                    color = Color.White,
+                                    fontSize = 14.sp,
+                                    maxLines = 1,
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clickable {
+                                            viewModel.selectSong(song, index, autoPlay = true, queue = openPlaylistSongs)
+                                            openPlaylist = null
+                                            onSongSelected()
+                                        }
+                                        .padding(vertical = 8.dp)
+                                )
+                                TextButton(onClick = { viewModel.moveInPlaylist(shownPlaylist.id, index, -1) }) { Text("Up") }
+                                TextButton(onClick = { viewModel.moveInPlaylist(shownPlaylist.id, index, 1) }) { Text("Down") }
+                            }
                         }
                     }
                 }

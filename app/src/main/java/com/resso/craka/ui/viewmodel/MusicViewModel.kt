@@ -23,6 +23,7 @@ import com.resso.craka.data.model.PlaylistEntity
 import com.resso.craka.data.model.SongEntity
 import com.resso.craka.data.model.VibeEntity
 import com.resso.craka.flash.FlashSyncManager
+import com.resso.craka.player.AppEqualizer
 import com.resso.craka.player.StreamPlayerManager
 import com.resso.craka.util.LyricsParser
 import kotlinx.coroutines.Job
@@ -172,6 +173,39 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val trendingSongs: StateFlow<List<SongEntity>> = _trendingSongs.asStateFlow()
 
     private val playbackQueue = MutableStateFlow<List<SongEntity>>(emptyList())
+    val queue: StateFlow<List<SongEntity>> = playbackQueue.asStateFlow()
+
+    private val _recentSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val recentSongs: StateFlow<List<SongEntity>> = _recentSongs.asStateFlow()
+
+    private val _pendingSearch = MutableStateFlow<String?>(null)
+    val pendingSearch: StateFlow<String?> = _pendingSearch.asStateFlow()
+
+    fun openSearch(query: String) {
+        _pendingSearch.value = query
+    }
+
+    fun consumePendingSearch() {
+        _pendingSearch.value = null
+    }
+
+    private val _searchHistory = MutableStateFlow<List<String>>(emptyList())
+    val searchHistory: StateFlow<List<String>> = _searchHistory.asStateFlow()
+
+    private val _homeRows = MutableStateFlow<List<Pair<String, List<SongEntity>>>>(emptyList())
+    val homeRows: StateFlow<List<Pair<String, List<SongEntity>>>> = _homeRows.asStateFlow()
+
+    private val _lyricOffsetMs = MutableStateFlow(0)
+    val lyricOffsetMs: StateFlow<Int> = _lyricOffsetMs.asStateFlow()
+
+    private val _sleepMinutesLeft = MutableStateFlow(0)
+    val sleepMinutesLeft: StateFlow<Int> = _sleepMinutesLeft.asStateFlow()
+
+    private val _equalizerPreset = MutableStateFlow("Off")
+    val equalizerPreset: StateFlow<String> = _equalizerPreset.asStateFlow()
+
+    private val appEqualizer = AppEqualizer()
+    private var sleepJob: Job? = null
 
     private var searchJob: Job? = null
     private var progressJob: Job? = null
@@ -195,12 +229,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         PlaybackService.commands.onPause = { pausePlayback() }
         PlaybackService.commands.onNext = { playNextSong() }
         PlaybackService.commands.onPrevious = { playPreviousSong() }
+        PlaybackService.commands.onSeek = { seekTo(it) }
+        _recentSongs.value = repository.recentSongs()
+        _searchHistory.value = playerPrefs.getString("search_history", "")
+            .orEmpty()
+            .split("\n")
+            .filter { it.isNotBlank() }
         _isShuffle.value = playerPrefs.getBoolean("shuffle", false)
         _repeatMode.value = playerPrefs.getInt("repeat", 0)
         setupPlayerListener()
         setupStreamListener()
         startProgressTracking()
         loadTrendingSongs()
+        loadHomeRows()
         setupNetworkConnectivityListener()
 
         viewModelScope.launch {
@@ -286,8 +327,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     _currentPositionMs.value = streamPos
                     val currentLyrics = _lyrics.value
                     if (currentLyrics.isNotEmpty()) {
-                        val idx = currentLyrics.indexOfLast { it.timeMs <= streamPos }
-                        _activeLyricIndex.value = if (idx >= 0) idx else 0
+                        updateLyricIndex(streamPos)
                     }
                 }
             }
@@ -391,6 +431,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 }
 
                 _searchResults.value = combined
+                if (combined.isNotEmpty()) rememberSearch(trimmed)
                 if (combined.isEmpty()) {
                     _searchError.value = "No songs found for '$trimmed'"
                 }
@@ -470,6 +511,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (song != null && !song.id.startsWith("yt_")) {
                     if (state == Player.STATE_READY) {
                         _durationMs.value = player.duration.coerceAtLeast(1L)
+                        appEqualizer.attach(player.audioSessionId)
+                        appEqualizer.apply(_equalizerPreset.value)
                     } else if (state == Player.STATE_ENDED) {
                         handleSongEnded()
                     }
@@ -491,10 +534,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                     // Update active lyric index
                     val currentLyrics = _lyrics.value
-                    if (currentLyrics.isNotEmpty()) {
-                        val idx = currentLyrics.indexOfLast { it.timeMs <= pos }
-                        _activeLyricIndex.value = if (idx >= 0) idx else 0
-                    }
+                    if (currentLyrics.isNotEmpty()) updateLyricIndex(pos)
                 }
                 delay(250)
             }
@@ -514,6 +554,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
         _currentSong.value = song
         _currentSongIndex.value = index
+        repository.rememberRecent(song)
+        _recentSongs.value = repository.recentSongs()
+        _lyricOffsetMs.value = playerPrefs.getInt("offset_${song.id}", 0)
         if (needsRealLyrics(song.lyricsLrc)) {
             _lyrics.value = emptyList()
             _lyricsStatus.value = "Finding lyrics…"
@@ -574,7 +617,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             artist = song.artist,
             playing = playing,
             artUrl = song.albumArtUrl,
-            songId = song.id
+            songId = song.id,
+            positionMs = _currentPositionMs.value
         )
     }
 
@@ -853,8 +897,122 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun updateLyricIndex(positionMs: Long) {
+        val adjusted = positionMs + _lyricOffsetMs.value
+        val idx = _lyrics.value.indexOfLast { it.timeMs <= adjusted }
+        _activeLyricIndex.value = if (idx >= 0) idx else 0
+    }
+
+    fun nudgeLyricOffset(deltaMs: Int) {
+        val song = _currentSong.value ?: return
+        val next = (_lyricOffsetMs.value + deltaMs).coerceIn(-10000, 10000)
+        _lyricOffsetMs.value = next
+        playerPrefs.edit().putInt("offset_${song.id}", next).apply()
+        updateLyricIndex(_currentPositionMs.value)
+    }
+
+    fun seekToLyric(timeMs: Long) {
+        seekTo((timeMs - _lyricOffsetMs.value).coerceAtLeast(0))
+    }
+
+    fun removeFromQueue(songId: String) {
+        playbackQueue.value = playbackQueue.value.filter { it.id != songId }
+    }
+
+    fun moveInQueue(index: Int, direction: Int) {
+        val items = playbackQueue.value.toMutableList()
+        val target = index + direction
+        if (index !in items.indices || target !in items.indices) return
+        val item = items.removeAt(index)
+        items.add(target, item)
+        playbackQueue.value = items
+    }
+
+    fun addToQueue(song: SongEntity) {
+        if (playbackQueue.value.any { it.id == song.id }) return
+        playbackQueue.value = playbackQueue.value + song
+    }
+
+    fun startSleepTimer(minutes: Int) {
+        sleepJob?.cancel()
+        _sleepMinutesLeft.value = minutes
+        sleepJob = viewModelScope.launch {
+            var left = minutes
+            while (left > 0) {
+                delay(60_000)
+                left -= 1
+                _sleepMinutesLeft.value = left
+            }
+            pausePlayback()
+        }
+    }
+
+    fun cancelSleepTimer() {
+        sleepJob?.cancel()
+        _sleepMinutesLeft.value = 0
+    }
+
+    fun setEqualizerPreset(preset: String) {
+        _equalizerPreset.value = preset
+        val song = _currentSong.value
+        if (song?.id?.startsWith("yt_") == true) {
+            _networkStatusMessage.value = "Equalizer works on uploaded and saved songs"
+            return
+        }
+        appEqualizer.attach(player.audioSessionId)
+        appEqualizer.apply(preset)
+    }
+
+    fun saveCurrentOffline() {
+        val song = _currentSong.value ?: return
+        viewModelScope.launch {
+            val message = repository.saveForOffline(song)
+            _networkStatusMessage.value = message
+            val updated = repository.getSongById(song.id)
+            if (updated != null && _currentSong.value?.id == song.id) {
+                _currentSong.value = updated
+            }
+        }
+    }
+
+    fun moveInPlaylist(playlistId: Long, index: Int, direction: Int) {
+        viewModelScope.launch {
+            repository.movePlaylistSong(playlistId, index, index + direction)
+            val playlist = repository.getPlaylist(playlistId) ?: return@launch
+            _openPlaylistSongs.value = repository.songsInPlaylist(playlist)
+        }
+    }
+
+    private fun rememberSearch(query: String) {
+        val next = listOf(query) + _searchHistory.value.filter { !it.equals(query, ignoreCase = true) }
+        _searchHistory.value = next.take(8)
+        playerPrefs.edit().putString("search_history", _searchHistory.value.joinToString("\n")).apply()
+    }
+
+    private fun loadHomeRows() {
+        viewModelScope.launch {
+            val queries = listOf(
+                "Romantic" to "Romantic Hindi Songs",
+                "Punjabi" to "Punjabi Hits",
+                "Arijit Singh" to "Arijit Singh"
+            )
+            val rows = mutableListOf<Pair<String, List<SongEntity>>>()
+            for ((title, query) in queries) {
+                val songs = try {
+                    repository.searchSongsOnline(query).take(8)
+                } catch (_: Exception) {
+                    emptyList()
+                }
+                if (songs.isNotEmpty()) rows.add(title to songs)
+                _homeRows.value = rows.toList()
+            }
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
+        appEqualizer.release()
+        sleepJob?.cancel()
         try {
             networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
         } catch (_: Exception) {}
@@ -867,6 +1025,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         PlaybackService.commands.onPause = null
         PlaybackService.commands.onNext = null
         PlaybackService.commands.onPrevious = null
+        PlaybackService.commands.onSeek = null
         PlaybackService.stop(getApplication())
     }
 }

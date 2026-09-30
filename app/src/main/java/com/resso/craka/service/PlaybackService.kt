@@ -37,6 +37,7 @@ class PlaybackService : Service() {
     private var artJob: Job? = null
     private var artBitmap: Bitmap? = null
     private var artUrlLoaded: String? = null
+    private var playbackPositionMs: Long = 0L
 
     override fun onCreate() {
         super.onCreate()
@@ -58,7 +59,15 @@ class PlaybackService : Service() {
                 override fun onSkipToPrevious() {
                     commands.onPrevious?.invoke()
                 }
+
+                override fun onSeekTo(pos: Long) {
+                    commands.onSeek?.invoke(pos)
+                }
             })
+            setFlags(
+                MediaSessionCompat.FLAG_HANDLES_MEDIA_BUTTONS or
+                    MediaSessionCompat.FLAG_HANDLES_TRANSPORT_CONTROLS
+            )
             isActive = true
         }
     }
@@ -79,11 +88,12 @@ class PlaybackService : Service() {
                 val title = intent?.getStringExtra(EXTRA_TITLE) ?: "Resso"
                 val artist = intent?.getStringExtra(EXTRA_ARTIST) ?: ""
                 val playing = intent?.getBooleanExtra(EXTRA_PLAYING, false) ?: false
+                val positionMs = intent?.getLongExtra(EXTRA_POSITION, 0L) ?: 0L
                 val artUrl = intent?.getStringExtra(EXTRA_ART).orEmpty()
                 val songId = intent?.getStringExtra(EXTRA_SONG_ID).orEmpty()
                 val notification = buildNotification(title, artist, playing, artBitmap)
                 startForeground(NOTIFICATION_ID, notification)
-                updateSession(title, artist, playing, artBitmap)
+                updateSession(title, artist, playing, artBitmap, positionMs)
                 if (playing) holdWakeLock() else releaseWakeLock()
                 loadArtwork(title, artist, playing, songId, artUrl)
             }
@@ -153,7 +163,8 @@ class PlaybackService : Service() {
         }
     }
 
-    private fun updateSession(title: String, artist: String, playing: Boolean, artwork: Bitmap? = null) {
+    private fun updateSession(title: String, artist: String, playing: Boolean, artwork: Bitmap? = null, positionMs: Long = -1L) {
+        if (positionMs >= 0) playbackPositionMs = positionMs
         val state = if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         mediaSession.setPlaybackState(
             PlaybackStateCompat.Builder()
@@ -161,9 +172,11 @@ class PlaybackService : Service() {
                     PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
                         PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
-                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                        PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
+                        PlaybackStateCompat.ACTION_SEEK_TO or
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE
                 )
-                .setState(state, PlaybackStateCompat.PLAYBACK_POSITION_UNKNOWN, if (playing) 1f else 0f)
+                .setState(state, playbackPositionMs, if (playing) 1f else 0f)
                 .build()
         )
         val metadata = MediaMetadataCompat.Builder()
@@ -262,6 +275,7 @@ class PlaybackService : Service() {
         private const val EXTRA_PLAYING = "playing"
         private const val EXTRA_ART = "art"
         private const val EXTRA_SONG_ID = "songId"
+        private const val EXTRA_POSITION = "position"
 
         val commands = PlaybackCommands()
 
@@ -271,7 +285,8 @@ class PlaybackService : Service() {
             artist: String,
             playing: Boolean,
             artUrl: String = "",
-            songId: String = ""
+            songId: String = "",
+            positionMs: Long = 0L
         ) {
             val intent = Intent(context, PlaybackService::class.java).apply {
                 action = ACTION_UPDATE
@@ -280,6 +295,7 @@ class PlaybackService : Service() {
                 putExtra(EXTRA_PLAYING, playing)
                 putExtra(EXTRA_ART, artUrl)
                 putExtra(EXTRA_SONG_ID, songId)
+                putExtra(EXTRA_POSITION, positionMs)
             }
             ContextCompat.startForegroundService(context, intent)
         }
@@ -295,4 +311,5 @@ class PlaybackCommands {
     var onPause: (() -> Unit)? = null
     var onNext: (() -> Unit)? = null
     var onPrevious: (() -> Unit)? = null
+    var onSeek: ((Long) -> Unit)? = null
 }

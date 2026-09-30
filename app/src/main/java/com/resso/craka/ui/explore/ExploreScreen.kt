@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -90,12 +92,23 @@ fun ExploreScreen(
     val searchError by viewModel.searchError.collectAsState()
     val trendingSongs by viewModel.trendingSongs.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
+    val searchHistory by viewModel.searchHistory.collectAsState()
+    val pendingSearch by viewModel.pendingSearch.collectAsState()
+    val homeRows by viewModel.homeRows.collectAsState()
 
     var searchKeyword by remember { mutableStateOf("") }
     var selectedMood by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
 
     // Debounced automatic search while typing
+    LaunchedEffect(pendingSearch) {
+        val query = pendingSearch
+        if (!query.isNullOrBlank()) {
+            searchKeyword = query
+            viewModel.consumePendingSearch()
+        }
+    }
+
     LaunchedEffect(searchKeyword) {
         if (searchKeyword.isNotBlank()) {
             delay(700)
@@ -217,6 +230,29 @@ fun ExploreScreen(
                 .testTag("explore_search_input")
         )
 
+        if (searchHistory.isNotEmpty() && searchKeyword.isBlank()) {
+            Spacer(modifier = Modifier.height(10.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                searchHistory.forEach { query ->
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(18.dp))
+                            .background(RessoCardBg)
+                            .clickable {
+                                searchKeyword = query
+                                focusManager.clearFocus()
+                            }
+                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                    ) {
+                        Text(text = query, color = Color.White, fontSize = 12.sp)
+                    }
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(10.dp))
 
         // Quick Suggestion Chips (Popular Searches)
@@ -316,6 +352,44 @@ fun ExploreScreen(
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(text = "Searching...", color = RessoPrimary, fontSize = 12.sp)
                 }
+            }
+        }
+
+        if (searchKeyword.isBlank() && homeRows.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(8.dp))
+            homeRows.forEach { (title, songs) ->
+                Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                Spacer(modifier = Modifier.height(8.dp))
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    items(songs.size) { index ->
+                        val song = songs[index]
+                        Column(
+                            modifier = Modifier
+                                .width(112.dp)
+                                .clickable {
+                                    viewModel.playSongFromAnywhere(song, autoPlay = true, queue = songs)
+                                    onSongSelected()
+                                }
+                        ) {
+                            AlbumArtwork(
+                                songId = song.id,
+                                albumArtUrl = song.albumArtUrl,
+                                contentDescription = song.title,
+                                modifier = Modifier
+                                    .size(112.dp)
+                                    .clip(RoundedCornerShape(8.dp))
+                            )
+                            Text(
+                                text = song.title,
+                                color = Color.White,
+                                fontSize = 12.sp,
+                                maxLines = 1,
+                                modifier = Modifier.padding(top = 6.dp)
+                            )
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(14.dp))
             }
         }
 

@@ -292,6 +292,10 @@ class MainActivity : ComponentActivity() {
                                         viewModel = musicViewModel,
                                         onOpenVibeCreator = { currentTab = "vibe_creator" },
                                         onNavigateToSearch = { currentTab = "explore" },
+                                        onOpenArtist = { artist ->
+                                            currentTab = "explore"
+                                            musicViewModel.openSearch(artist)
+                                        },
                                         onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
                                     )
                                 }

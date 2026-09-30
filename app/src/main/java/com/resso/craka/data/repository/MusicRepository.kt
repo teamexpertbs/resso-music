@@ -89,6 +89,53 @@ class MusicRepository(context: Context) {
         return ids.mapNotNull { found[it] }
     }
 
+    fun recentSongs(): List<SongEntity> = catalogCache.read("recent_played", WEEK_MS).orEmpty()
+
+    fun rememberRecent(song: SongEntity) {
+        val next = listOf(song) + recentSongs().filter { it.id != song.id }
+        catalogCache.write("recent_played", next.take(30))
+    }
+
+    suspend fun movePlaylistSong(playlistId: Long, from: Int, to: Int) {
+        val playlist = playlistDao.getPlaylist(playlistId) ?: return
+        val ids = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        if (from !in ids.indices || to !in ids.indices) return
+        val item = ids.removeAt(from)
+        ids.add(to, item)
+        playlistDao.updatePlaylist(playlist.copy(songIdsCsv = ids.joinToString(",")))
+    }
+
+    suspend fun getPlaylist(id: Long) = playlistDao.getPlaylist(id)
+
+    suspend fun saveForOffline(song: SongEntity): String {
+        if (song.id.startsWith("yt_") || song.audioUrl.contains("youtube.com") || song.audioUrl.contains("youtu.be")) {
+            return "YouTube songs can't be saved offline"
+        }
+        if (song.audioUrl.startsWith("file://") || song.audioUrl.startsWith("/")) {
+            return "Already saved on this phone"
+        }
+        if (!song.audioUrl.startsWith("http")) {
+            if (songDao.getSongById(song.id) == null) songDao.insertSong(song.copy(isCustomUpload = true))
+            return "Saved in your library"
+        }
+        return try {
+            val dir = java.io.File(appContext.filesDir, "offline").apply { mkdirs() }
+            val target = java.io.File(dir, song.id.replace(Regex("[^a-zA-Z0-9_]"), "_") + ".audio")
+            val request = okhttp3.Request.Builder().url(song.audioUrl).build()
+            okhttp3.OkHttpClient().newCall(request).execute().use { response ->
+                if (!response.isSuccessful) return "Couldn't save this song"
+                target.outputStream().use { out -> response.body?.byteStream()?.copyTo(out) }
+            }
+            val saved = song.copy(audioUrl = target.absolutePath, isCustomUpload = true)
+            songDao.insertSong(saved)
+            "Saved for offline play"
+        } catch (e: Exception) {
+            "Couldn't save this song"
+        }
+    }
+
+    private val appContext = context.applicationContext
+
     suspend fun addSongToPlaylist(playlistId: Long, song: SongEntity) {
         if (songDao.getSongById(song.id) == null) {
             songDao.insertSong(song)

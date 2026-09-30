@@ -19,6 +19,8 @@ import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.aspectRatio
@@ -66,7 +68,9 @@ import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
+import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -98,6 +102,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.resso.craka.player.AppEqualizer
 import com.resso.craka.ui.components.AlbumArtwork
 import com.resso.craka.ui.components.VideoBackground
 import com.resso.craka.ui.theme.RessoCardBg
@@ -116,6 +121,7 @@ fun VibePlayerScreen(
     viewModel: MusicViewModel,
     onOpenVibeCreator: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
+    onOpenArtist: (String) -> Unit = {},
     onOpenSidebar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
@@ -349,7 +355,12 @@ fun VibePlayerScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(top = 4.dp)
+                        .clickable {
+                            val artist = currentSong?.artist?.substringBefore(",")?.trim().orEmpty()
+                            if (artist.isNotBlank()) onOpenArtist(artist)
+                        }
                 )
+                PlayerToolRow(viewModel)
                 val lyricLine = lyrics.getOrNull(activeLyricIndex)?.text
                     ?: lyricsStatus.ifBlank { "Lyrics" }
                 Text(
@@ -403,7 +414,7 @@ fun VibePlayerScreen(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 8.dp)
-                                .clickable { viewModel.seekTo(lyric.timeMs) }
+                                .clickable { viewModel.seekToLyric(lyric.timeMs) }
                                 .testTag("lyric_line_$index")
                         )
                     }
@@ -539,11 +550,15 @@ fun VibePlayerScreen(
                 tint = Color.White,
                 tag = "player_share_button",
                 onClick = {
-                    val title = currentSong?.title ?: "a song"
-                    val artist = currentSong?.artist ?: "Resso"
+                    val song = currentSong
+                    val link = if (song?.id?.startsWith("yt_") == true) {
+                        "https://www.youtube.com/watch?v=${song.id.removePrefix("yt_")}"
+                    } else {
+                        "Listening to ${song?.title ?: "a song"} by ${song?.artist ?: "Resso"}"
+                    }
                     val share = Intent(Intent.ACTION_SEND).apply {
                         type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, "Listening to $title by $artist on Resso")
+                        putExtra(Intent.EXTRA_TEXT, link)
                     }
                     context.startActivity(Intent.createChooser(share, "Share"))
                 }
@@ -636,4 +651,119 @@ private fun PlayerTopActionButton(
             modifier = Modifier.size(18.dp)
         )
     }
+}
+
+@Composable
+private fun PlayerToolRow(viewModel: MusicViewModel) {
+    val queue by viewModel.queue.collectAsState()
+    val sleep by viewModel.sleepMinutesLeft.collectAsState()
+    val offset by viewModel.lyricOffsetMs.collectAsState()
+    var sheet by remember { mutableStateOf<String?>(null) }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .horizontalScroll(rememberScrollState())
+            .padding(top = 12.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
+    ) {
+        ToolChip("Queue") { sheet = "queue" }
+        ToolChip(if (sleep > 0) "Sleep ${sleep}m" else "Sleep") { sheet = "sleep" }
+        ToolChip("EQ") { sheet = "eq" }
+        ToolChip("Save") { viewModel.saveCurrentOffline() }
+        ToolChip("Sync") { sheet = "offset" }
+    }
+    when (sheet) {
+        "queue" -> AlertDialog(
+            onDismissRequest = { sheet = null },
+            containerColor = Color(0xFF161616),
+            title = { Text("Up next", color = Color.White) },
+            text = {
+                if (queue.isEmpty()) {
+                    Text("Queue is empty", color = RessoTextSecondary)
+                } else {
+                    Column {
+                        queue.forEachIndexed { index, song ->
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Text(song.title, color = Color.White, maxLines = 1, modifier = Modifier.weight(1f))
+                                TextButton(onClick = { viewModel.moveInQueue(index, -1) }) { Text("Up") }
+                                TextButton(onClick = { viewModel.moveInQueue(index, 1) }) { Text("Down") }
+                                TextButton(onClick = { viewModel.removeFromQueue(song.id) }) { Text("Remove") }
+                            }
+                        }
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
+        )
+        "sleep" -> AlertDialog(
+            onDismissRequest = { sheet = null },
+            containerColor = Color(0xFF161616),
+            title = { Text("Sleep timer", color = Color.White) },
+            text = {
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf(15, 30, 60).forEach { minutes ->
+                        TextButton(onClick = {
+                            viewModel.startSleepTimer(minutes)
+                            sheet = null
+                        }) { Text("${minutes}m") }
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    viewModel.cancelSleepTimer()
+                    sheet = null
+                }) { Text("Cancel timer") }
+            }
+        )
+        "eq" -> AlertDialog(
+            onDismissRequest = { sheet = null },
+            containerColor = Color(0xFF161616),
+            title = { Text("Equalizer", color = Color.White) },
+            text = {
+                Column {
+                    AppEqualizer.presets.forEach { preset ->
+                        Text(
+                            text = preset,
+                            color = Color.White,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    viewModel.setEqualizerPreset(preset)
+                                    sheet = null
+                                }
+                                .padding(vertical = 8.dp)
+                        )
+                    }
+                }
+            },
+            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
+        )
+        "offset" -> AlertDialog(
+            onDismissRequest = { sheet = null },
+            containerColor = Color(0xFF161616),
+            title = { Text("Lyrics sync ${offset / 1000f}s", color = Color.White) },
+            text = {
+                Row {
+                    TextButton(onClick = { viewModel.nudgeLyricOffset(-500) }) { Text("-0.5s") }
+                    TextButton(onClick = { viewModel.nudgeLyricOffset(500) }) { Text("+0.5s") }
+                }
+            },
+            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Done") } }
+        )
+    }
+}
+
+@Composable
+private fun ToolChip(label: String, onClick: () -> Unit) {
+    Text(
+        text = label,
+        color = Color.White,
+        fontSize = 12.sp,
+        modifier = Modifier
+            .clip(RoundedCornerShape(20.dp))
+            .background(Color.White.copy(alpha = 0.12f))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 6.dp)
+    )
 }
