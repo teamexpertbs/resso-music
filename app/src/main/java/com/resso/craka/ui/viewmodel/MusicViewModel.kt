@@ -932,11 +932,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun addToQueue(song: SongEntity) {
         if (playbackQueue.value.any { it.id == song.id }) {
-            _networkStatusMessage.value = "Already in the queue"
+            _networkStatusMessage.value = "Yeh gaana queue mein pehle se hai"
             return
         }
         playbackQueue.value = playbackQueue.value + song
-        _networkStatusMessage.value = "Added to queue"
+        _networkStatusMessage.value = "Queue mein add ho gaya"
     }
 
     fun startSleepTimer(minutes: Int) {
@@ -967,7 +967,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val song = _currentSong.value
         if (song?.id?.startsWith("yt_") == true) {
             appEqualizer.release()
-            _networkStatusMessage.value = "Equalizer works on saved audio. YouTube playback is left alone."
+            _networkStatusMessage.value = "Equalizer saved audio par chalta hai. YouTube playback par nahi lagta."
             return
         }
         applyEqualizer()
