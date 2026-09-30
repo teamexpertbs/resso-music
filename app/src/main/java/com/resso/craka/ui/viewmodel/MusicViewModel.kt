@@ -875,28 +875,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _isPosterDialogOpen.value = false
     }
 
-    // Custom song upload
-    fun addLocalSong(uri: Uri, title: String, artist: String) {
-        viewModelScope.launch {
-            val newSong = SongEntity(
-                id = "custom_${System.currentTimeMillis()}",
-                title = title.ifBlank { "Local Track" },
-                artist = artist.ifBlank { "Unknown Artist" },
-                album = "My Uploads",
-                durationMs = 180000L,
-                audioUrl = uri.toString(),
-                albumArtUrl = "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80",
-                lyricsLrc = "[00:00.00] Enjoy your uploaded track\n[00:10.00] Add a custom Vibe background from the side menu!\n[00:25.00] Tap lyrics to seek anytime",
-                genre = "Custom",
-                mood = "Chill",
-                isLiked = true,
-                isCustomUpload = true
-            )
-            repository.insertCustomSong(newSong)
-            selectSong(newSong, allSongs.value.size, autoPlay = true)
-        }
-    }
-
     private fun updateLyricIndex(positionMs: Long) {
         val adjusted = positionMs + _lyricOffsetMs.value
         val idx = _lyrics.value.indexOfLast { it.timeMs <= adjusted }
@@ -956,7 +934,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _equalizerPreset.value = preset
         val song = _currentSong.value
         if (song?.id?.startsWith("yt_") == true) {
-            _networkStatusMessage.value = "Equalizer works on uploaded and saved songs"
+            _networkStatusMessage.value = "Equalizer works on saved songs"
             return
         }
         appEqualizer.attach(player.audioSessionId)

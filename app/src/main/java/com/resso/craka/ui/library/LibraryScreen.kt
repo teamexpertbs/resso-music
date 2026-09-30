@@ -29,7 +29,6 @@ import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.PlaylistPlay
-import androidx.compose.material.icons.filled.Upload
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -91,7 +90,6 @@ fun LibraryScreen(
     val allSongs by viewModel.allSongs.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
     val openPlaylistSongs by viewModel.openPlaylistSongs.collectAsState()
-    val customUploads = allSongs.filter { it.isCustomUpload }
     var openPlaylist by remember { mutableStateOf<com.resso.craka.data.model.PlaylistEntity?>(null) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
@@ -99,7 +97,7 @@ fun LibraryScreen(
     var newPlaylistTitle by remember { mutableStateOf("") }
 
     val recentSongs by viewModel.recentSongs.collectAsState()
-    val tabTitles = listOf("Liked", "Recent", "Playlists", "Uploads", "Vibes")
+    val tabTitles = listOf("Liked", "Recent", "Playlists", "Vibes")
 
     Column(
         modifier = modifier
@@ -244,7 +242,7 @@ fun LibraryScreen(
                     }
                 }
             }
-            4 -> {
+            3 -> {
                 // Created Vibes (from Room database)
                 if (allVibes.isEmpty()) {
                     Box(
@@ -408,30 +406,6 @@ fun LibraryScreen(
                                     }
                                 }
                             }
-                        }
-                    }
-                }
-            }
-            3 -> {
-                // Uploads
-                if (customUploads.isEmpty()) {
-                    EmptyStateBox(
-                        title = "No Uploaded Tracks",
-                        subtitle = "Add your favorite songs and offline tracks anytime to your personal collection!",
-                        icon = Icons.Default.Upload
-                    )
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        itemsIndexed(customUploads, key = { _, s -> s.id }) { index, song ->
-                            SongListItem(
-                                song = song,
-                                isPlayingThis = false,
-                                onPlay = {
-                                    viewModel.selectSong(song, index, autoPlay = true, queue = customUploads)
-                                    onSongSelected()
-                                },
-                                onToggleLike = { viewModel.toggleLikeSong(song) }
-                            )
                         }
                     }
                 }

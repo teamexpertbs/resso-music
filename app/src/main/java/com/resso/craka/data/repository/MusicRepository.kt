@@ -115,7 +115,7 @@ class MusicRepository(context: Context) {
             return "Already saved on this phone"
         }
         if (!song.audioUrl.startsWith("http")) {
-            if (songDao.getSongById(song.id) == null) songDao.insertSong(song.copy(isCustomUpload = true))
+            if (songDao.getSongById(song.id) == null) songDao.insertSong(song)
             return "Saved in your library"
         }
         return try {
@@ -126,7 +126,7 @@ class MusicRepository(context: Context) {
                 if (!response.isSuccessful) return "Couldn't save this song"
                 target.outputStream().use { out -> response.body?.byteStream()?.copyTo(out) }
             }
-            val saved = song.copy(audioUrl = target.absolutePath, isCustomUpload = true)
+            val saved = song.copy(audioUrl = target.absolutePath)
             songDao.insertSong(saved)
             "Saved for offline play"
         } catch (e: Exception) {

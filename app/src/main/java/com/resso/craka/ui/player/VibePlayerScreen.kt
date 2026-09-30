@@ -2,7 +2,6 @@ package com.resso.craka.ui.player
 
 import android.Manifest
 import android.content.pm.PackageManager
-import android.net.Uri
 import android.content.Intent
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -64,7 +63,6 @@ import androidx.compose.material.icons.filled.Shuffle
 import androidx.compose.material.icons.filled.SkipNext
 import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material.icons.filled.Tune
-import androidx.compose.material.icons.filled.UploadFile
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -158,17 +156,6 @@ fun VibePlayerScreen(
     val isVideoMode by viewModel.isVideoMode.collectAsState()
     val isLyricsVisible by viewModel.isLyricsVisible.collectAsState()
     val isFlashSyncEnabled by viewModel.isFlashSyncEnabled.collectAsState()
-
-    // Audio file picker launcher
-    val audioPickerLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) {
-            val fileName = uri.lastPathSegment?.substringAfterLast('/') ?: "My Track"
-            viewModel.addLocalSong(uri, fileName, "Local Artist")
-            Toast.makeText(context, "Playing: $fileName", Toast.LENGTH_SHORT).show()
-        }
-    }
 
     // Camera permission launcher for back flashlight / beat sync
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
