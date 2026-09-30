@@ -511,8 +511,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (song != null && !song.id.startsWith("yt_")) {
                     if (state == Player.STATE_READY) {
                         _durationMs.value = player.duration.coerceAtLeast(1L)
-                        appEqualizer.attach(player.audioSessionId)
-                        appEqualizer.apply(_equalizerPreset.value)
+                        applyEqualizer()
                     } else if (state == Player.STATE_ENDED) {
                         handleSongEnded()
                     }
@@ -580,13 +579,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             val videoId = song.id.removePrefix("yt_")
             streamPlayerManager.loadAndPlay(videoId, autoPlay)
             if (_isVolumeBoosterEnabled.value) streamPlayerManager.setBoost(true)
+            applyEqualizer()
             _isPlaying.value = autoPlay
         } else {
             // Standard media: pause Stream, play via ExoPlayer
             streamPlayerManager.pause()
             _isVideoMode.value = false
             try {
-                val mediaItem = MediaItem.fromUri(Uri.parse(song.audioUrl))
+                val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
                 player.setMediaItem(mediaItem)
                 player.prepare()
                 if (autoPlay) {
@@ -894,7 +894,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun removeFromQueue(songId: String) {
-        playbackQueue.value = playbackQueue.value.filter { it.id != songId }
+        val wasCurrent = _currentSong.value?.id == songId
+        val remaining = playbackQueue.value.filter { it.id != songId }
+        playbackQueue.value = remaining
+        if (!wasCurrent) return
+        val next = remaining.firstOrNull()
+        if (next == null) {
+            pausePlayback()
+            return
+        }
+        selectSong(next, 0, autoPlay = true, queue = remaining)
     }
 
     fun moveInQueue(index: Int, direction: Int) {
@@ -932,13 +941,28 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setEqualizerPreset(preset: String) {
         _equalizerPreset.value = preset
-        val song = _currentSong.value
-        if (song?.id?.startsWith("yt_") == true) {
-            _networkStatusMessage.value = "Equalizer works on saved songs"
+        if (preset == "Off") {
+            appEqualizer.release()
             return
         }
-        appEqualizer.attach(player.audioSessionId)
+        applyEqualizer()
+    }
+
+    private fun applyEqualizer() {
+        val preset = _equalizerPreset.value
+        if (preset == "Off") return
+        val song = _currentSong.value
+        val session = if (song?.id?.startsWith("yt_") == true) {
+            0
+        } else {
+            player.audioSessionId
+        }
+        appEqualizer.attach(if (session == C.AUDIO_SESSION_ID_UNSET) 0 else session)
         appEqualizer.apply(preset)
+    }
+
+    private fun mediaUri(audioUrl: String): Uri {
+        return if (audioUrl.startsWith("/")) Uri.fromFile(java.io.File(audioUrl)) else Uri.parse(audioUrl)
     }
 
     fun saveCurrentOffline() {
@@ -974,16 +998,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 "Punjabi" to "Punjabi Hits",
                 "Arijit Singh" to "Arijit Singh"
             )
-            val rows = mutableListOf<Pair<String, List<SongEntity>>>()
-            for ((title, query) in queries) {
-                val songs = try {
-                    repository.searchSongsOnline(query).take(8)
-                } catch (_: Exception) {
-                    emptyList()
-                }
-                if (songs.isNotEmpty()) rows.add(title to songs)
-                _homeRows.value = rows.toList()
+            val rows = queries.mapNotNull { (title, query) ->
+                val songs = repository.peekSearch(query).take(8)
+                if (songs.isEmpty()) null else title to songs
             }
+            _homeRows.value = rows
         }
     }
 

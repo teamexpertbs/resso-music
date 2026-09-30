@@ -347,7 +347,6 @@ fun VibePlayerScreen(
                             if (artist.isNotBlank()) onOpenArtist(artist)
                         }
                 )
-                PlayerToolRow(viewModel)
                 val lyricLine = lyrics.getOrNull(activeLyricIndex)?.text
                     ?: lyricsStatus.ifBlank { "Lyrics" }
                 Text(
@@ -431,6 +430,7 @@ fun VibePlayerScreen(
             val progress = if (isUserSeeking) seekValue else {
                 if (duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
             }
+            PlayerToolRow(viewModel)
             Slider(
                 value = progress,
                 onValueChange = {

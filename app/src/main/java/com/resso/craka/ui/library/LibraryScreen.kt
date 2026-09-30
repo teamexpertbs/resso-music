@@ -213,7 +213,8 @@ fun LibraryScreen(
                                     viewModel.selectSong(song, index, autoPlay = true, queue = likedSongs)
                                     onSongSelected()
                                 },
-                                onToggleLike = { viewModel.toggleLikeSong(song) }
+                                onToggleLike = { viewModel.toggleLikeSong(song) },
+                                onAddToQueue = { viewModel.addToQueue(song) }
                             )
                         }
                     }
@@ -236,7 +237,8 @@ fun LibraryScreen(
                                     viewModel.selectSong(song, index, autoPlay = true, queue = recentSongs)
                                     onSongSelected()
                                 },
-                                onToggleLike = { viewModel.toggleLikeSong(song) }
+                                onToggleLike = { viewModel.toggleLikeSong(song) },
+                                onAddToQueue = { viewModel.addToQueue(song) }
                             )
                         }
                     }
@@ -376,7 +378,8 @@ fun LibraryScreen(
                                             color = Color.White,
                                             fontSize = 15.sp
                                         )
-                                        val count = playlist.songIdsCsv.split(",").count { it.isNotBlank() }
+                                        val ids = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+                                        val count = ids.count { id -> allSongs.any { it.id == id } }
                                         Text(
                                             text = if (count == 0) "Empty playlist" else "$count songs",
                                             color = RessoTextSecondary,

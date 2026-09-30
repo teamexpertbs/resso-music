@@ -5,10 +5,10 @@ import android.util.Log
 
 class AppEqualizer {
     private var equalizer: Equalizer? = null
-    private var attachedSession: Int = 0
+    private var attachedSession: Int = Int.MIN_VALUE
 
     fun attach(sessionId: Int) {
-        if (sessionId == 0 || sessionId == attachedSession && equalizer != null) return
+        if (equalizer != null && sessionId == attachedSession) return
         release()
         try {
             equalizer = Equalizer(0, sessionId).apply { enabled = true }
@@ -16,6 +16,7 @@ class AppEqualizer {
         } catch (e: Exception) {
             Log.w(TAG, "Equalizer unavailable: ${e.message}")
             equalizer = null
+            attachedSession = Int.MIN_VALUE
         }
     }
 
@@ -44,7 +45,7 @@ class AppEqualizer {
         } catch (_: Exception) {
         }
         equalizer = null
-        attachedSession = 0
+        attachedSession = Int.MIN_VALUE
     }
 
     companion object {

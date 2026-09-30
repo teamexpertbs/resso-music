@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.PlaylistAdd
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
@@ -476,6 +477,7 @@ fun ExploreScreen(
                         onToggleLike = {
                             viewModel.toggleLikeSong(song)
                         },
+                        onAddToQueue = { viewModel.addToQueue(song) },
                         isOnline = song.id.startsWith("online_")
                     )
                 }
@@ -490,6 +492,7 @@ fun SongListItem(
     isPlayingThis: Boolean,
     onPlay: () -> Unit,
     onToggleLike: () -> Unit,
+    onAddToQueue: (() -> Unit)? = null,
     isOnline: Boolean = false
 ) {
     Card(
@@ -618,6 +621,17 @@ fun SongListItem(
                 fontSize = 11.sp,
                 modifier = Modifier.padding(end = 4.dp)
             )
+
+            if (onAddToQueue != null) {
+                IconButton(onClick = onAddToQueue) {
+                    Icon(
+                        imageVector = Icons.Default.PlaylistAdd,
+                        contentDescription = "Add to queue",
+                        tint = RessoTextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+            }
 
             // Like / Heart button
             IconButton(onClick = onToggleLike) {

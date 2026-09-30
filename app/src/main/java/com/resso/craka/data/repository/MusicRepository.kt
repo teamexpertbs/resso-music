@@ -59,6 +59,11 @@ class MusicRepository(context: Context) {
     }
 
     fun peekTrending(): List<SongEntity> = catalogCache.read(TRENDING_KEY, WEEK_MS).orEmpty()
+
+    fun peekSearch(query: String): List<SongEntity> {
+        val key = "search_${query.trim().lowercase()}"
+        return catalogCache.read(key, WEEK_MS).orEmpty()
+    }
     suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
     suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
     suspend fun updateSongLyrics(songId: String, lyrics: String) = songDao.updateSongLyrics(songId, lyrics)
@@ -126,7 +131,7 @@ class MusicRepository(context: Context) {
                 if (!response.isSuccessful) return "Couldn't save this song"
                 target.outputStream().use { out -> response.body?.byteStream()?.copyTo(out) }
             }
-            val saved = song.copy(audioUrl = target.absolutePath)
+            val saved = song.copy(audioUrl = android.net.Uri.fromFile(target).toString())
             songDao.insertSong(saved)
             "Saved for offline play"
         } catch (e: Exception) {
