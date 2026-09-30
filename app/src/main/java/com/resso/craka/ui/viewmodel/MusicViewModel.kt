@@ -73,6 +73,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
 
+    private val _streamVisible = MutableStateFlow(false)
+    val streamVisible: StateFlow<Boolean> = _streamVisible.asStateFlow()
+
+    private val _openPlaylistSongs = MutableStateFlow<List<SongEntity>>(emptyList())
+    val openPlaylistSongs: StateFlow<List<SongEntity>> = _openPlaylistSongs.asStateFlow()
+
+    private val playerPrefs = application.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
+
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
 
@@ -187,6 +195,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         PlaybackService.commands.onPause = { pausePlayback() }
         PlaybackService.commands.onNext = { playNextSong() }
         PlaybackService.commands.onPrevious = { playPreviousSong() }
+        _isShuffle.value = playerPrefs.getBoolean("shuffle", false)
+        _repeatMode.value = playerPrefs.getInt("repeat", 0)
         setupPlayerListener()
         setupStreamListener()
         startProgressTracking()
@@ -520,12 +530,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         observeCommentsForSong(song.id)
 
         if (song.id.startsWith("yt_")) {
-            // Online Stream Song: pause ExoPlayer, play via Stream Manager in full length
             if (player.isPlaying) {
                 player.stop()
             }
+            _streamVisible.value = true
             val videoId = song.id.removePrefix("yt_")
             streamPlayerManager.loadAndPlay(videoId, autoPlay)
+            if (_isVolumeBoosterEnabled.value) streamPlayerManager.setBoost(true)
             _isPlaying.value = autoPlay
         } else {
             // Standard media: pause Stream, play via ExoPlayer
@@ -605,7 +616,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun togglePlayPause() {
         val song = _currentSong.value ?: return
         if (song.id.startsWith("yt_")) {
-            streamPlayerManager.togglePlayPause()
+            if (_isPlaying.value) pausePlayback() else resumePlayback()
             return
         } else if (player.isPlaying) {
             player.pause()
@@ -659,17 +670,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleShuffle() {
         _isShuffle.value = !_isShuffle.value
+        playerPrefs.edit().putBoolean("shuffle", _isShuffle.value).apply()
     }
 
     fun toggleRepeat() {
         _repeatMode.value = (_repeatMode.value + 1) % 3
+        playerPrefs.edit().putInt("repeat", _repeatMode.value).apply()
     }
 
     fun toggleLikeCurrentSong() {
         val song = _currentSong.value ?: return
+        toggleLikeSong(song)
+    }
+
+    fun createPlaylist(name: String) {
+        val trimmed = name.trim()
+        if (trimmed.isBlank()) return
+        viewModelScope.launch { repository.createPlaylist(trimmed) }
+    }
+
+    fun addSongToPlaylist(playlistId: Long, song: SongEntity) {
+        viewModelScope.launch { repository.addSongToPlaylist(playlistId, song) }
+    }
+
+    fun loadPlaylistSongs(playlist: PlaylistEntity) {
         viewModelScope.launch {
-            repository.toggleLike(song.id, song.isLiked)
-            _currentSong.value = song.copy(isLiked = !song.isLiked)
+            _openPlaylistSongs.value = repository.songsInPlaylist(playlist)
+        }
+    }
+
+    fun playPlaylist(playlist: PlaylistEntity) {
+        viewModelScope.launch {
+            val songs = repository.songsInPlaylist(playlist)
+            if (songs.isNotEmpty()) {
+                _openPlaylistSongs.value = songs
+                selectSong(songs.first(), 0, autoPlay = true, queue = songs)
+            }
         }
     }
 
@@ -709,8 +745,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleVolumeBooster() {
         val newState = !_isVolumeBoosterEnabled.value
         _isVolumeBoosterEnabled.value = newState
-        val vol = if (newState) 1.5f else 1.0f
-        player.volume = vol
+        player.volume = if (newState) 1.5f else 1.0f
+        streamPlayerManager.setBoost(newState)
     }
 
     // Vibe Creator: Save custom video vibe associated with current song

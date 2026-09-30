@@ -19,7 +19,7 @@ class MusicRepository(context: Context) {
         context.applicationContext,
         AppDatabase::class.java,
         "resso_music.db"
-    ).build()
+    ).fallbackToDestructiveMigration(true).build()
 
     val songDao = db.songDao()
     val vibeDao = db.vibeDao()
@@ -82,6 +82,23 @@ class MusicRepository(context: Context) {
         )
     }
 
+    suspend fun songsInPlaylist(playlist: PlaylistEntity): List<SongEntity> {
+        val ids = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        if (ids.isEmpty()) return emptyList()
+        val found = songDao.getSongsByIds(ids).associateBy { it.id }
+        return ids.mapNotNull { found[it] }
+    }
+
+    suspend fun addSongToPlaylist(playlistId: Long, song: SongEntity) {
+        if (songDao.getSongById(song.id) == null) {
+            songDao.insertSong(song)
+        }
+        val playlist = playlistDao.getPlaylist(playlistId) ?: return
+        val ids = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        if (song.id !in ids) ids.add(song.id)
+        playlistDao.updatePlaylist(playlist.copy(songIdsCsv = ids.joinToString(",")))
+    }
+
     companion object {
         private const val TRENDING_KEY = "trending"
         private const val TRENDING_CACHE_MS = 12 * 60 * 60 * 1000L
@@ -90,9 +107,6 @@ class MusicRepository(context: Context) {
     }
 
     private suspend fun seedInitialDataIfEmpty() {
-        try {
-            songDao.clearOldNonYtSongs()
-        } catch (_: Exception) {}
         val count = songDao.getSongCount()
         if (count >= 8) return
 

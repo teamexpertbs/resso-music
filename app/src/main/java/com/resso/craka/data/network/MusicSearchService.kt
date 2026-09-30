@@ -8,7 +8,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 import okhttp3.FormBody
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -25,6 +28,21 @@ class MusicSearchService {
 
     companion object {
         private const val TAG = "MusicSearchService"
+    }
+
+    private suspend fun fetchText(request: Request): Pair<Int, String?> {
+        return suspendCancellableCoroutine { cont ->
+            val call = client.newCall(request)
+            cont.invokeOnCancellation { call.cancel() }
+            try {
+                call.execute().use { response ->
+                    val text = response.body?.string()
+                    if (cont.isActive) cont.resume(response.code to text)
+                }
+            } catch (e: Exception) {
+                if (cont.isActive) cont.resumeWithException(e)
+            }
+        }
     }
 
     private val youtubeApiKey = BuildConfig.YOUTUBE_API_KEY.trim()
@@ -59,7 +77,8 @@ class MusicSearchService {
                 async {
                     val videos = searchYouTubeSongs("${track.title} ${track.artist}", 3)
                     val match = videos.firstOrNull { titlesMatch(track.title, it.title) } ?: videos.firstOrNull()
-                    match?.copy(
+                    if (match == null || !titlesMatch(track.title, match.title)) return@async null
+                    match.copy(
                         title = track.title,
                         artist = track.artist,
                         album = track.album,
@@ -93,13 +112,11 @@ class MusicSearchService {
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "YouTube search returned code: ${response.code}")
+            val (code, bodyString) = fetchText(request)
+            if (code !in 200..299 || bodyString == null) {
+                Log.w(TAG, "YouTube search returned code: $code")
                 return@withContext emptyList()
             }
-
-            val bodyString = response.body?.string() ?: return@withContext emptyList()
             val json = JSONObject(bodyString)
             val items = json.optJSONArray("items") ?: return@withContext emptyList()
 
@@ -160,7 +177,7 @@ class MusicSearchService {
         }
     }
 
-    private fun fetchVideoDurations(videoIds: List<String>): Map<String, Long> {
+    private suspend fun fetchVideoDurations(videoIds: List<String>): Map<String, Long> {
         val durations = mutableMapOf<String, Long>()
         try {
             val idsChunk = videoIds.joinToString(",")
@@ -170,10 +187,8 @@ class MusicSearchService {
                     "&key=$youtubeApiKey"
 
             val request = Request.Builder().url(url).build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return durations
-
-            val bodyString = response.body?.string() ?: return durations
+            val (code, bodyString) = fetchText(request)
+            if (code !in 200..299 || bodyString == null) return durations
             val json = JSONObject(bodyString)
             val items = json.optJSONArray("items") ?: return durations
 
@@ -229,12 +244,11 @@ class MusicSearchService {
                 .header("Authorization", "Bearer $token")
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "Spotify search returned code: ${response.code}")
+            val (code, body) = fetchText(request)
+            if (code !in 200..299 || body == null) {
+                Log.w(TAG, "Spotify search returned code: $code")
                 return@withContext emptyList()
             }
-            val body = response.body?.string() ?: return@withContext emptyList()
             val tracks = JSONObject(body).optJSONObject("tracks")?.optJSONArray("items")
                 ?: return@withContext emptyList()
             val songs = mutableListOf<SongEntity>()
@@ -284,7 +298,7 @@ class MusicSearchService {
         }
     }
 
-    private fun spotifyAccessToken(): String? {
+    private suspend fun spotifyAccessToken(): String? {
         if (spotifyClientId.isBlank() || spotifyClientSecret.isBlank()) return null
         val now = System.currentTimeMillis()
         spotifyToken?.let { cached ->
@@ -295,18 +309,18 @@ class MusicSearchService {
                 "$spotifyClientId:$spotifyClientSecret".toByteArray(),
                 Base64.NO_WRAP
             )
-            val body = FormBody.Builder().add("grant_type", "client_credentials").build()
+            val form = FormBody.Builder().add("grant_type", "client_credentials").build()
             val request = Request.Builder()
                 .url("https://accounts.spotify.com/api/token")
                 .header("Authorization", "Basic $basic")
-                .post(body)
+                .post(form)
                 .build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) {
-                Log.w(TAG, "Spotify token request failed: ${response.code}")
+            val (code, body) = fetchText(request)
+            if (code !in 200..299 || body == null) {
+                Log.w(TAG, "Spotify token request failed: $code")
                 return null
             }
-            val json = JSONObject(response.body?.string().orEmpty())
+            val json = JSONObject(body)
             val token = json.optString("access_token", "")
             val expiresIn = json.optLong("expires_in", 3600L)
             if (token.isBlank()) return null
@@ -347,10 +361,22 @@ class MusicSearchService {
     }
 
     private fun titlesMatch(left: String, right: String): Boolean {
-        val a = left.lowercase().replace(Regex("[^a-z0-9]"), "")
-        val b = right.lowercase().replace(Regex("[^a-z0-9]"), "")
+        val a = normalizeTitle(left)
+        val b = normalizeTitle(right)
         if (a.length < 3 || b.length < 3) return false
-        return a == b || a in b || b in a
+        if (a == b || a in b || b in a) return true
+        val aTokens = a.split(" ").filter { it.length > 2 }
+        val bTokens = b.split(" ").filter { it.length > 2 }
+        if (aTokens.isEmpty() || bTokens.isEmpty()) return false
+        val shared = aTokens.count { it in bTokens }
+        return shared >= minOf(2, aTokens.size)
+    }
+
+    private fun normalizeTitle(value: String): String {
+        return value.lowercase()
+            .replace(Regex("""(?i)\b(official|video|audio|lyric|lyrics|full|song|hd|4k)\b"""), " ")
+            .replace(Regex("[^a-z0-9]+"), " ")
+            .trim()
     }
 
     suspend fun searchItunesSongs(query: String, limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {
@@ -362,10 +388,8 @@ class MusicSearchService {
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
 
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return@withContext emptyList()
-
-            val bodyString = response.body?.string() ?: return@withContext emptyList()
+            val (code, bodyString) = fetchText(request)
+            if (code !in 200..299 || bodyString == null) return@withContext emptyList()
             val json = JSONObject(bodyString)
             val resultsArray = json.optJSONArray("results") ?: return@withContext emptyList()
 
@@ -422,7 +446,7 @@ class MusicSearchService {
             ?: fetchPlainLyrics(cleanArtist, cleanTitle)
     }
 
-    private fun searchLrcLib(artist: String, title: String): String? {
+    private suspend fun searchLrcLib(artist: String, title: String): String? {
         return try {
             val url = buildString {
                 append("https://lrclib.net/api/search?track_name=")
@@ -436,9 +460,9 @@ class MusicSearchService {
                 .url(url)
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return null
-            val items = JSONArray(response.body?.string().orEmpty())
+            val (code, body) = fetchText(request)
+            if (code !in 200..299 || body == null) return null
+            val items = JSONArray(body)
             var bestSynced = ""
             var bestPlain = ""
             for (i in 0 until items.length()) {
@@ -455,7 +479,7 @@ class MusicSearchService {
         }
     }
 
-    private fun fetchPlainLyrics(artist: String, title: String): String? {
+    private suspend fun fetchPlainLyrics(artist: String, title: String): String? {
         if (artist.isBlank()) return null
         return try {
             val url = "https://api.lyrics.ovh/v1/" +
@@ -465,9 +489,9 @@ class MusicSearchService {
                 .url(url)
                 .header("User-Agent", "RessoMusicApp/1.0 (Android)")
                 .build()
-            val response = client.newCall(request).execute()
-            if (!response.isSuccessful) return null
-            val lyrics = JSONObject(response.body?.string().orEmpty()).optString("lyrics", "").trim()
+            val (code, body) = fetchText(request)
+            if (code !in 200..299 || body == null) return null
+            val lyrics = JSONObject(body).optString("lyrics", "").trim()
             lyrics.ifBlank { null }
         } catch (_: Exception) {
             null

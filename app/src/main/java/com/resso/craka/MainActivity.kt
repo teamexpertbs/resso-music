@@ -274,15 +274,17 @@ class MainActivity : ComponentActivity() {
                                 .fillMaxSize()
                                 .padding(bottom = if (currentTab == "vibe_creator") 0.dp else innerPadding.calculateBottomPadding())
                         ) {
-                            // Persistent Stream WebView: NEVER detached when switching tabs or closing MV, so MP3 audio never stops!
-                            AndroidView(
-                                factory = { ctx ->
-                                    val wv = musicViewModel.streamPlayerManager.getWebView()
-                                    (wv.parent as? ViewGroup)?.removeView(wv)
-                                    wv
-                                },
-                                modifier = Modifier.fillMaxSize()
-                            )
+                            val streamVisible by musicViewModel.streamVisible.collectAsState()
+                            if (streamVisible) {
+                                AndroidView(
+                                    factory = { _ ->
+                                        val wv = musicViewModel.streamPlayerManager.getWebView()
+                                        (wv.parent as? ViewGroup)?.removeView(wv)
+                                        wv
+                                    },
+                                    modifier = Modifier.fillMaxSize()
+                                )
+                            }
 
                             when (currentTab) {
                                 "foryou" -> {

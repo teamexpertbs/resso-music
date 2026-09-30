@@ -89,7 +89,10 @@ fun LibraryScreen(
     val allVibes by viewModel.allVibes.collectAsState()
     val allPlaylists by viewModel.allPlaylists.collectAsState()
     val allSongs by viewModel.allSongs.collectAsState()
+    val currentSong by viewModel.currentSong.collectAsState()
+    val openPlaylistSongs by viewModel.openPlaylistSongs.collectAsState()
     val customUploads = allSongs.filter { it.isCustomUpload }
+    var openPlaylist by remember { mutableStateOf<com.resso.craka.data.model.PlaylistEntity?>(null) }
 
     var selectedTabIndex by remember { mutableIntStateOf(0) }
     var isNewPlaylistDialogOpen by remember { mutableStateOf(false) }
@@ -304,7 +307,12 @@ fun LibraryScreen(
                             Card(
                                 shape = RoundedCornerShape(14.dp),
                                 colors = CardDefaults.cardColors(containerColor = RessoSurface),
-                                modifier = Modifier.fillMaxWidth()
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        openPlaylist = playlist
+                                        viewModel.loadPlaylistSongs(playlist)
+                                    }
                             ) {
                                 Row(
                                     modifier = Modifier
@@ -333,11 +341,33 @@ fun LibraryScreen(
                                             color = Color.White,
                                             fontSize = 15.sp
                                         )
+                                        val count = playlist.songIdsCsv.split(",").count { it.isNotBlank() }
                                         Text(
-                                            text = playlist.description.ifBlank { "Playlist created by you" },
+                                            text = if (count == 0) "Empty playlist" else "$count songs",
                                             color = RessoTextSecondary,
                                             fontSize = 12.sp
                                         )
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            val song = currentSong
+                                            if (song == null) {
+                                                Toast.makeText(context, "Play a song first, then add it", Toast.LENGTH_SHORT).show()
+                                            } else {
+                                                viewModel.addSongToPlaylist(playlist.id, song)
+                                                Toast.makeText(context, "Added to ${playlist.name}", Toast.LENGTH_SHORT).show()
+                                            }
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.Add, contentDescription = "Add current song", tint = RessoPrimary)
+                                    }
+                                    IconButton(
+                                        onClick = {
+                                            viewModel.playPlaylist(playlist)
+                                            onSongSelected()
+                                        }
+                                    ) {
+                                        Icon(Icons.Default.PlayArrow, contentDescription = "Play playlist", tint = Color.White)
                                     }
                                 }
                             }
@@ -396,8 +426,8 @@ fun LibraryScreen(
                 Button(
                     onClick = {
                         if (newPlaylistTitle.isNotBlank()) {
-                            // Note: We can add playlist creation via repository if needed
-                            Toast.makeText(context, "Playlist '$newPlaylistTitle' created!", Toast.LENGTH_SHORT).show()
+                            viewModel.createPlaylist(newPlaylistTitle)
+                            Toast.makeText(context, "Playlist '$newPlaylistTitle' created", Toast.LENGTH_SHORT).show()
                             newPlaylistTitle = ""
                             isNewPlaylistDialogOpen = false
                         }
@@ -410,6 +440,53 @@ fun LibraryScreen(
             dismissButton = {
                 TextButton(onClick = { isNewPlaylistDialogOpen = false }) {
                     Text("Cancel", color = RessoTextSecondary)
+                }
+            }
+        )
+    }
+
+    val shownPlaylist = openPlaylist
+    if (shownPlaylist != null) {
+        AlertDialog(
+            onDismissRequest = { openPlaylist = null },
+            containerColor = RessoSurface,
+            title = { Text(shownPlaylist.name, color = Color.White, fontWeight = FontWeight.Bold) },
+            text = {
+                if (openPlaylistSongs.isEmpty()) {
+                    Text("This playlist is empty. Use + on the playlist to add the song that is playing.", color = RessoTextSecondary)
+                } else {
+                    Column {
+                        openPlaylistSongs.forEach { song ->
+                            Text(
+                                text = "${song.title} · ${song.artist}",
+                                color = Color.White,
+                                fontSize = 14.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable {
+                                        viewModel.selectSong(song, 0, autoPlay = true, queue = openPlaylistSongs)
+                                        openPlaylist = null
+                                        onSongSelected()
+                                    }
+                                    .padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.playPlaylist(shownPlaylist)
+                        openPlaylist = null
+                        onSongSelected()
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary)
+                ) { Text("Play") }
+            },
+            dismissButton = {
+                TextButton(onClick = { openPlaylist = null }) {
+                    Text("Close", color = RessoTextSecondary)
                 }
             }
         )

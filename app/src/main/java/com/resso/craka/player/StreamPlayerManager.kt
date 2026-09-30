@@ -40,11 +40,7 @@ class StreamPlayerManager(private val context: Context) {
 
     var onVideoEnded: (() -> Unit)? = null
 
-    init {
-        mainHandler.post {
-            initWebView()
-        }
-    }
+    fun hasWebView(): Boolean = webView != null
 
     @SuppressLint("SetJavaScriptEnabled")
     private fun initWebView() {
@@ -164,6 +160,15 @@ class StreamPlayerManager(private val context: Context) {
             "if (window.shouldResume && player && player.getPlayerState && player.getPlayerState() !== 1 && player.getPlayerState() !== 3) { player.playVideo(); }",
             null
         )
+    }
+
+    fun setBoost(enabled: Boolean) {
+        mainHandler.post {
+            webView?.evaluateJavascript(
+                "window.boosted = $enabled; if (player && player.setVolume) { player.setVolume(window.boosted ? 100 : 60); }",
+                null
+            )
+        }
     }
 
     fun setHighQuality(enabled: Boolean) {
@@ -358,6 +363,7 @@ class StreamPlayerManager(private val context: Context) {
                     }
 
                     window.wantHd = false;
+                    window.boosted = false;
                     window.applyQuality = function() {
                         if (!player || !player.setPlaybackQuality) return;
                         var q = window.wantHd ? 'large' : 'small';
@@ -368,7 +374,10 @@ class StreamPlayerManager(private val context: Context) {
                     };
 
                     function onPlayerStateChange(event) {
-                        if (event.data === 1) window.applyQuality();
+                        if (event.data === 1) {
+                            window.applyQuality();
+                            if (player.setVolume) player.setVolume(window.boosted ? 100 : 60);
+                        }
                         if (window.AndroidBridge) {
                             window.AndroidBridge.onStateChange(event.data);
                         }
