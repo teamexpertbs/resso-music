@@ -159,7 +159,7 @@ class StreamPlayerManager(private val context: Context) {
 
     private fun nudgePlayback() {
         webView?.evaluateJavascript(
-            "if (window.shouldResume && player && player.getPlayerState && player.getPlayerState() !== 1 && player.getPlayerState() !== 3) { player.playVideo(); }",
+            "if (window.shouldResume && player && player.getPlayerState && player.getPlayerState() !== 1 && player.getPlayerState() !== 3 && player.getPlayerState() !== 0) { player.playVideo(); }",
             null
         )
     }
@@ -263,6 +263,7 @@ class StreamPlayerManager(private val context: Context) {
                     0 -> {
                         _isPlaying.value = false
                         _isLoading.value = false
+                        webView?.evaluateJavascript("window.shouldResume = false;", null)
                         onVideoEnded?.invoke()
                     }
                 }
@@ -399,7 +400,7 @@ class StreamPlayerManager(private val context: Context) {
                     } catch (e) {}
                     window.shouldResume = false;
                     document.addEventListener('visibilitychange', function() {
-                        if (window.shouldResume && player && player.playVideo) {
+                        if (window.shouldResume && player && player.playVideo && player.getPlayerState && player.getPlayerState() !== 0) {
                             player.playVideo();
                         }
                     });
