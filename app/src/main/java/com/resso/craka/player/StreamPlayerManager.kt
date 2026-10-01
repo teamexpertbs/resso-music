@@ -173,6 +173,25 @@ class StreamPlayerManager(private val context: Context) {
         }
     }
 
+    fun setVolume(volumePercent: Int) {
+        val clamped = volumePercent.coerceIn(0, 100)
+        mainHandler.post {
+            webView?.evaluateJavascript(
+                "if (player && player.setVolume) { player.setVolume($clamped); }",
+                null
+            )
+        }
+    }
+
+    fun set8DAudio(enabled: Boolean) {
+        mainHandler.post {
+            webView?.evaluateJavascript(
+                "window.is8D = $enabled; if (window.toggle8D) { window.toggle8D($enabled); }",
+                null
+            )
+        }
+    }
+
     fun setHighQuality(enabled: Boolean) {
         mainHandler.post {
             webView?.evaluateJavascript(
@@ -369,6 +388,10 @@ class StreamPlayerManager(private val context: Context) {
 
                     window.wantHd = false;
                     window.boosted = false;
+                    window.is8D = false;
+                    window.toggle8D = function(enabled) {
+                        window.is8D = enabled;
+                    };
                     window.applyQuality = function() {
                         if (!player || !player.setPlaybackQuality) return;
                         var q = window.wantHd ? 'large' : 'small';

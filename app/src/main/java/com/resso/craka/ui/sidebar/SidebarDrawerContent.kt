@@ -48,6 +48,15 @@ import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
+import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -83,6 +92,10 @@ fun SidebarDrawerContent(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isFlashSync by viewModel.isFlashSyncEnabled.collectAsState()
     val isVolumeBooster by viewModel.isVolumeBoosterEnabled.collectAsState()
+    val is8DEnabled by viewModel.is8DAudioEnabled.collectAsState()
+    val isCrossfadeEnabled by viewModel.isCrossfadeEnabled.collectAsState()
+    val sleepMinutes by viewModel.sleepMinutesLeft.collectAsState()
+    var showSleepDialog by remember { mutableStateOf(false) }
 
     // Camera permission for Flash Torch
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -484,6 +497,226 @@ fun SidebarDrawerContent(
 
         Spacer(modifier = Modifier.height(14.dp))
 
+        // SECTION 2B: 8D AUDIO & SPATIAL SOUND
+        Text(
+            text = "🎧 8D SPATIAL AUDIO",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = RessoSecondary,
+            letterSpacing = 1.5.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = RessoCardBg),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(if (is8DEnabled) RessoSecondary.copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Headphones,
+                            contentDescription = null,
+                            tint = if (is8DEnabled) RessoSecondary else RessoTextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "8D Audio & Spatial Sound",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = if (is8DEnabled) "3D binaural surround sound (Headphones)" else "Standard stereo",
+                            color = if (is8DEnabled) RessoSecondary else RessoTextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = is8DEnabled,
+                    onCheckedChange = {
+                        viewModel.toggle8DAudio()
+                        Toast.makeText(
+                            context,
+                            if (!is8DEnabled) "🎧 8D Spatial Sound: ON" else "8D Audio: OFF",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = RessoSecondary,
+                        uncheckedThumbColor = RessoTextSecondary,
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.1f)
+                    ),
+                    modifier = Modifier.testTag("sidebar_8d_switch")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // SECTION 2C: SEAMLESS CROSSFADE (DJ TRANSITION)
+        Text(
+            text = "🎛️ SEAMLESS CROSSFADE",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFFFFB300),
+            letterSpacing = 1.5.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = RessoCardBg),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(38.dp)
+                            .clip(CircleShape)
+                            .background(if (isCrossfadeEnabled) Color(0xFFFFB300).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Tune,
+                            contentDescription = null,
+                            tint = if (isCrossfadeEnabled) Color(0xFFFFB300) else RessoTextSecondary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.width(12.dp))
+
+                    Column {
+                        Text(
+                            text = "DJ Crossfade (4s)",
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White,
+                            fontSize = 14.sp
+                        )
+                        Text(
+                            text = if (isCrossfadeEnabled) "Smooth gapless mix • Zero silence" else "Normal track switch",
+                            color = if (isCrossfadeEnabled) Color(0xFFFFB300) else RessoTextSecondary,
+                            fontSize = 12.sp
+                        )
+                    }
+                }
+
+                Switch(
+                    checked = isCrossfadeEnabled,
+                    onCheckedChange = {
+                        viewModel.toggleCrossfade()
+                        Toast.makeText(
+                            context,
+                            if (!isCrossfadeEnabled) "🎛️ DJ Crossfade: ON" else "Crossfade: OFF",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    },
+                    colors = SwitchDefaults.colors(
+                        checkedThumbColor = Color.White,
+                        checkedTrackColor = Color(0xFFFFB300),
+                        uncheckedThumbColor = RessoTextSecondary,
+                        uncheckedTrackColor = Color.White.copy(alpha = 0.1f)
+                    ),
+                    modifier = Modifier.testTag("sidebar_crossfade_switch")
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // SECTION 2D: SLEEP TIMER (WITH FADE-OUT)
+        Text(
+            text = "🌙 SLEEP TIMER",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = Color(0xFF64B5F6),
+            letterSpacing = 1.5.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = RessoCardBg),
+            modifier = Modifier
+                .fillMaxWidth()
+                .clickable { showSleepDialog = true }
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(if (sleepMinutes > 0) Color(0xFF64B5F6).copy(alpha = 0.2f) else Color.White.copy(alpha = 0.06f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Bedtime,
+                        contentDescription = null,
+                        tint = if (sleepMinutes > 0) Color(0xFF64B5F6) else RessoTextSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Sleep Timer with Fade-Out",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = if (sleepMinutes > 0) "Active: $sleepMinutes mins left (Fades gently to stop)" else "Smooth 30s volume fade-out when falling asleep",
+                        color = if (sleepMinutes > 0) Color(0xFF64B5F6) else RessoTextSecondary,
+                        fontSize = 12.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         // SECTION 3: LYRIC POSTER CREATOR
         Text(
             text = "📜 LYRIC POSTER",
@@ -681,6 +914,73 @@ fun SidebarDrawerContent(
         }
 
         Spacer(modifier = Modifier.height(24.dp))
+    }
+
+    // Sleep Timer Selector Dialog with 30s Fade-Out
+    if (showSleepDialog) {
+        AlertDialog(
+            onDismissRequest = { showSleepDialog = false },
+            containerColor = RessoSurface,
+            title = {
+                Text(
+                    text = "🌙 Sleep Timer with Fade-Out",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold
+                )
+            },
+            text = {
+                Column {
+                    Text(
+                        text = "Music will gently fade down over the last 30 seconds so you won't be jolted awake.",
+                        color = RessoTextSecondary,
+                        fontSize = 13.sp,
+                        modifier = Modifier.padding(bottom = 14.dp)
+                    )
+                    listOf(15, 30, 45, 60).forEach { mins ->
+                        Button(
+                            onClick = {
+                                viewModel.startSleepTimer(mins)
+                                showSleepDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (sleepMinutes == mins) RessoPrimary else RessoCardBg
+                            ),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = "$mins Minutes",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                    if (sleepMinutes > 0) {
+                        Button(
+                            onClick = {
+                                viewModel.cancelSleepTimer()
+                                showSleepDialog = false
+                            },
+                            colors = ButtonDefaults.buttonColors(containerColor = Color.Red.copy(alpha = 0.3f)),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 8.dp)
+                        ) {
+                            Text("Turn Off Sleep Timer", color = Color.White)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showSleepDialog = false }) {
+                    Text("Close", color = RessoTextSecondary)
+                }
+            }
+        )
     }
 }
 

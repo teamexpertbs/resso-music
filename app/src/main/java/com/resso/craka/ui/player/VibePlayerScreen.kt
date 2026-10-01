@@ -644,6 +644,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
     val queue by viewModel.queue.collectAsState()
     val sleep by viewModel.sleepMinutesLeft.collectAsState()
     val offset by viewModel.lyricOffsetMs.collectAsState()
+    val is8D by viewModel.is8DAudioEnabled.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
     Row(
         modifier = Modifier
@@ -653,7 +654,8 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         ToolChip("Queue") { sheet = "queue" }
-        ToolChip(if (sleep > 0) "Sleep ${sleep}m" else "Sleep") { sheet = "sleep" }
+        ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { sheet = "sleep" }
+        ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D") { viewModel.toggle8DAudio() }
         ToolChip("EQ") { sheet = "eq" }
         ToolChip("Save") { viewModel.saveCurrentOffline() }
         ToolChip("Sync") { sheet = "offset" }

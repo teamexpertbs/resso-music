@@ -38,6 +38,7 @@ class PlaybackService : Service() {
     private var artBitmap: Bitmap? = null
     private var artUrlLoaded: String? = null
     private var playbackPositionMs: Long = 0L
+    private var playbackDurationMs: Long = 1L
 
     override fun onCreate() {
         super.onCreate()
@@ -89,11 +90,18 @@ class PlaybackService : Service() {
                 val artist = intent?.getStringExtra(EXTRA_ARTIST) ?: ""
                 val playing = intent?.getBooleanExtra(EXTRA_PLAYING, false) ?: false
                 val positionMs = intent?.getLongExtra(EXTRA_POSITION, 0L) ?: 0L
+                val durationMs = intent?.getLongExtra(EXTRA_DURATION, 1L) ?: 1L
                 val artUrl = intent?.getStringExtra(EXTRA_ART).orEmpty()
                 val songId = intent?.getStringExtra(EXTRA_SONG_ID).orEmpty()
+
+                playbackPositionMs = positionMs
+                if (durationMs > 1000L) {
+                    playbackDurationMs = durationMs
+                }
+
                 val notification = buildNotification(title, artist, playing, artBitmap)
                 startForeground(NOTIFICATION_ID, notification)
-                updateSession(title, artist, playing, artBitmap, positionMs)
+                updateSession(title, artist, playing, artBitmap, positionMs, playbackDurationMs)
                 if (playing) holdWakeLock() else releaseWakeLock()
                 loadArtwork(title, artist, playing, songId, artUrl)
             }
@@ -127,7 +135,7 @@ class PlaybackService : Service() {
             artUrlLoaded = resolved
             val manager = getSystemService(NotificationManager::class.java)
             manager.notify(NOTIFICATION_ID, buildNotification(title, artist, playing, bitmap))
-            updateSession(title, artist, playing, bitmap)
+            updateSession(title, artist, playing, bitmap, playbackPositionMs, playbackDurationMs)
         }
     }
 
@@ -164,28 +172,46 @@ class PlaybackService : Service() {
         }
     }
 
-    private fun updateSession(title: String, artist: String, playing: Boolean, artwork: Bitmap? = null, positionMs: Long = -1L) {
+    private fun updateSession(
+        title: String,
+        artist: String,
+        playing: Boolean,
+        artwork: Bitmap? = null,
+        positionMs: Long = -1L,
+        durationMs: Long = 1L
+    ) {
         if (positionMs >= 0) playbackPositionMs = positionMs
+        if (durationMs > 1000L) playbackDurationMs = durationMs
+
         val state = if (playing) PlaybackStateCompat.STATE_PLAYING else PlaybackStateCompat.STATE_PAUSED
         mediaSession.setPlaybackState(
             PlaybackStateCompat.Builder()
                 .setActions(
                     PlaybackStateCompat.ACTION_PLAY or
                         PlaybackStateCompat.ACTION_PAUSE or
+                        PlaybackStateCompat.ACTION_PLAY_PAUSE or
                         PlaybackStateCompat.ACTION_SKIP_TO_NEXT or
                         PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS or
                         PlaybackStateCompat.ACTION_SEEK_TO or
-                        PlaybackStateCompat.ACTION_PLAY_PAUSE
+                        PlaybackStateCompat.ACTION_STOP
                 )
-                .setState(state, playbackPositionMs, if (playing) 1f else 0f)
+                .setState(state, playbackPositionMs, if (playing) 1.0f else 0.0f)
                 .build()
         )
         val metadata = MediaMetadataCompat.Builder()
             .putString(MediaMetadataCompat.METADATA_KEY_TITLE, title)
             .putString(MediaMetadataCompat.METADATA_KEY_ARTIST, artist)
-            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Resso")
+            .putString(MediaMetadataCompat.METADATA_KEY_ALBUM, "Resso Music")
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_TITLE, title)
+            .putString(MediaMetadataCompat.METADATA_KEY_DISPLAY_SUBTITLE, artist)
+            .putLong(
+                MediaMetadataCompat.METADATA_KEY_DURATION,
+                if (playbackDurationMs > 1000L) playbackDurationMs else 180_000L
+            )
         if (artwork != null) {
             metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART, artwork)
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_ART, artwork)
+            metadata.putBitmap(MediaMetadataCompat.METADATA_KEY_DISPLAY_ICON, artwork)
         }
         mediaSession.setMetadata(metadata.build())
     }
@@ -206,12 +232,17 @@ class PlaybackService : Service() {
             .setSmallIcon(R.mipmap.ic_launcher)
             .setContentTitle(title)
             .setContentText(artist)
-        if (artwork != null) builder.setLargeIcon(artwork)
-        return builder
+            .setSubText("Resso Music • VIP")
+            .setColorized(true)
+            .setColor(0xFFE91E63.toInt()) // Vibrant Resso Neon Pink/Red theme accent
             .setContentIntent(openApp)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setOnlyAlertOnce(true)
             .setOngoing(playing)
+        if (artwork != null) {
+            builder.setLargeIcon(artwork)
+        }
+        return builder
             .addAction(NotificationCompat.Action(android.R.drawable.ic_media_previous, "Previous", serviceIntent(ACTION_PREV)))
             .addAction(playPauseAction)
             .addAction(NotificationCompat.Action(android.R.drawable.ic_media_next, "Next", serviceIntent(ACTION_NEXT)))
@@ -277,6 +308,7 @@ class PlaybackService : Service() {
         private const val EXTRA_ART = "art"
         private const val EXTRA_SONG_ID = "songId"
         private const val EXTRA_POSITION = "position"
+        private const val EXTRA_DURATION = "duration"
 
         val commands = PlaybackCommands()
 
@@ -290,7 +322,8 @@ class PlaybackService : Service() {
             playing: Boolean,
             artUrl: String = "",
             songId: String = "",
-            positionMs: Long = 0L
+            positionMs: Long = 0L,
+            durationMs: Long = 1L
         ) {
             if (!playing && !started) return
             started = true
@@ -302,6 +335,7 @@ class PlaybackService : Service() {
                 putExtra(EXTRA_ART, artUrl)
                 putExtra(EXTRA_SONG_ID, songId)
                 putExtra(EXTRA_POSITION, positionMs)
+                putExtra(EXTRA_DURATION, durationMs)
             }
             ContextCompat.startForegroundService(context, intent)
         }

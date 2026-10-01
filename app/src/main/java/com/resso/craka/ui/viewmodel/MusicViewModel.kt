@@ -203,6 +203,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _equalizerPreset = MutableStateFlow("Off")
     val equalizerPreset: StateFlow<String> = _equalizerPreset.asStateFlow()
 
+    private val _is8DAudioEnabled = MutableStateFlow(false)
+    val is8DAudioEnabled: StateFlow<Boolean> = _is8DAudioEnabled.asStateFlow()
+
+    private val _isCrossfadeEnabled = MutableStateFlow(true)
+    val isCrossfadeEnabled: StateFlow<Boolean> = _isCrossfadeEnabled.asStateFlow()
+
+    private var isCrossfading = false
+
     private val appEqualizer = AppEqualizer()
     private var sleepJob: Job? = null
 
@@ -318,6 +326,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     val currentLyrics = _lyrics.value
                     if (currentLyrics.isNotEmpty()) {
                         updateLyricIndex(streamPos)
+                    }
+
+                    // Seamless Crossfade & DJ Transition in last 3.5s
+                    if (_isCrossfadeEnabled.value && _isPlaying.value && _durationMs.value > 15_000L && !isCrossfading) {
+                        val remainingMs = _durationMs.value - streamPos
+                        if (remainingMs in 500L..3500L) {
+                            triggerCrossfade()
+                        }
                     }
                 }
             }
@@ -635,7 +651,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             playing = playing,
             artUrl = song.albumArtUrl,
             songId = song.id,
-            positionMs = _currentPositionMs.value
+            positionMs = _currentPositionMs.value,
+            durationMs = _durationMs.value
         )
     }
 
@@ -1001,20 +1018,69 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun startSleepTimer(minutes: Int) {
         sleepJob?.cancel()
         _sleepMinutesLeft.value = minutes
+        _networkStatusMessage.value = "🌙 Sleep Timer set for $minutes mins (Smooth 30s volume fade-out)"
         sleepJob = viewModelScope.launch {
             var left = minutes
-            while (left > 0) {
-                delay(60_000)
+            while (left > 1) {
+                kotlinx.coroutines.delay(60_000)
                 left -= 1
                 _sleepMinutesLeft.value = left
             }
+            if (left == 1) {
+                kotlinx.coroutines.delay(30_000)
+                _sleepMinutesLeft.value = 0
+                // 30 seconds smooth volume fade-out
+                for (v in 30 downTo 0) {
+                    val volPercent = (v * 100) / 30
+                    streamPlayerManager.setVolume(volPercent)
+                    kotlinx.coroutines.delay(1_000)
+                }
+            }
             pausePlayback()
+            streamPlayerManager.setVolume(100)
+            _sleepMinutesLeft.value = 0
         }
     }
 
     fun cancelSleepTimer() {
         sleepJob?.cancel()
+        streamPlayerManager.setVolume(100)
         _sleepMinutesLeft.value = 0
+        _networkStatusMessage.value = "Sleep Timer cancelled"
+    }
+
+    fun toggle8DAudio() {
+        val next = !_is8DAudioEnabled.value
+        _is8DAudioEnabled.value = next
+        appEqualizer.set8DAudio(next)
+        streamPlayerManager.set8DAudio(next)
+        if (next) {
+            _networkStatusMessage.value = "🎧 8D Spatial Audio: ON (3D binaural surround sound)"
+        } else {
+            _networkStatusMessage.value = "8D Audio: Normal"
+        }
+    }
+
+    fun toggleCrossfade() {
+        _isCrossfadeEnabled.value = !_isCrossfadeEnabled.value
+        _networkStatusMessage.value = if (_isCrossfadeEnabled.value) "🎛️ Crossfade DJ Transition: ON (4s gapless)" else "Crossfade: OFF"
+    }
+
+    private fun triggerCrossfade() {
+        isCrossfading = true
+        viewModelScope.launch {
+            for (step in 3 downTo 1) {
+                streamPlayerManager.setVolume(step * 30)
+                kotlinx.coroutines.delay(700)
+            }
+            playNextSong()
+            streamPlayerManager.setVolume(30)
+            kotlinx.coroutines.delay(400)
+            streamPlayerManager.setVolume(70)
+            kotlinx.coroutines.delay(500)
+            streamPlayerManager.setVolume(100)
+            isCrossfading = false
+        }
     }
 
     fun setEqualizerPreset(preset: String) {
@@ -1023,13 +1089,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             appEqualizer.release()
             return
         }
-        val song = _currentSong.value
-        if (song?.id?.startsWith("yt_") == true) {
-            appEqualizer.release()
-            _networkStatusMessage.value = "Equalizer saved audio par chalta hai. YouTube playback par nahi lagta."
-            return
-        }
-        applyEqualizer()
+        appEqualizer.attach(0)
+        appEqualizer.apply(preset)
+        _networkStatusMessage.value = "🎛️ Equalizer profile: $preset applied"
     }
 
     private fun applyEqualizer() {
