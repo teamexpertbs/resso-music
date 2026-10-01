@@ -11,7 +11,7 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   // Let network handle audio streams directly to avoid range request caching issues
-  if (event.request.url.includes('stream') || event.request.url.includes('audius.co') || event.request.url.includes('apple.com')) {
+  if (event.request.url.includes('stream') || event.request.url.includes('audius.co') || event.request.url.includes('audio')) {
     return;
   }
   
