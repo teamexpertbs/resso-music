@@ -594,7 +594,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun startYoutube(song: SongEntity, autoPlay: Boolean) {
-        if (player.isPlaying) player.stop()
+        // Stop and clear ExoPlayer completely to prevent dual audio playback
+        player.stop()
+        player.clearMediaItems()
         val videoId = song.id.removePrefix("yt_")
         if (!autoPlay) {
             streamPlayerManager.setKeepPlayingInBackground(false)
