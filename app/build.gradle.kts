@@ -11,7 +11,7 @@ plugins {
 
 android {
   namespace = "com.resso.craka"
-  compileSdk { version = release(36) { minorApiLevel = 1 } }
+  compileSdk = 36
 
   defaultConfig {
     applicationId = "com.resso.craka"
