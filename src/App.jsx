@@ -16,7 +16,7 @@ const INITIAL_SONGS = [
     artist: 'Arijit Singh & Pritam',
     album: 'Brahmāstra (Original Soundtrack)',
     duration: 268,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/38/4c/5c/384c5c8f-3ff8-e457-b2f7-3158ce108649/mzaf_12389299033886433185.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     likesCount: '2.8M',
@@ -58,7 +58,7 @@ const INITIAL_SONGS = [
     artist: 'Arijit Singh',
     album: 'Aashiqui 2 (Original Soundtrack)',
     duration: 262,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/77/59/c5/7759c5b2-b044-0e68-fea5-1fc4b84f312a/mzaf_3185920023072222766.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/2d/11/b9/2d11b994-b4fa-19eb-953d-70b472165e95/8903431566911_cover.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
     likesCount: '3.4M',
@@ -97,7 +97,7 @@ const INITIAL_SONGS = [
     artist: 'Ali Sethi x Shae Gill',
     album: 'Coke Studio Season 14',
     duration: 224,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview126/v4/62/33/1e/62331ea8-d1df-027d-fe75-ac16a519323d/mzaf_14381883946572745360.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/f3/f9/06/f3f906c3-79d5-ac9a-5fdd-262048f955f9/cover.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
     likesCount: '1.9M',
@@ -132,7 +132,7 @@ const INITIAL_SONGS = [
     artist: 'Arijit Singh & Sachin-Jigar',
     album: 'Bhediya (Original Soundtrack)',
     duration: 261,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/eb/27/61/eb2761c7-d606-0912-dff0-2dc6b69974bd/mzaf_2023722930851223219.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/2e/0b/c0/2e0bc070-112f-a827-6ad8-6bc64f7caaff/840214460180.png/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
     likesCount: '2.1M',
@@ -166,7 +166,7 @@ const INITIAL_SONGS = [
     artist: 'Arijit Singh & Shilpa Rao',
     album: 'Jawan (Original Soundtrack)',
     duration: 200,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/76/05/d9/7605d905-f631-517d-df7f-e162affcd414/mzaf_9976541859961700749.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/bb/f4/f5/bbf4f511-3c12-c25e-a475-b6d06faa8c13/8902894362047_cover.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     likesCount: '3.1M',
@@ -200,7 +200,7 @@ const INITIAL_SONGS = [
     artist: 'Jubin Nautiyal & Asees Kaur',
     album: 'Shershaah (Original Soundtrack)',
     duration: 230,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/ff/7a/7a/ff7a7a63-9947-cefa-e269-ad9602fb1ca3/mzaf_14039909875904828823.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/c3/df/e7/c3dfe71e-d532-458e-9c1c-32d40f8d9123/886449472222.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
     likesCount: '2.5M',
@@ -235,7 +235,7 @@ const INITIAL_SONGS = [
     artist: 'AP Dhillon, Gurinder Gill & Shinda Kahlon',
     album: 'Brown Munde (Official Release)',
     duration: 267,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/97/74/69/977469be-a9d5-35a7-80ad-ebe12a799ccc/mzaf_804867738726203367.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/26/a3/ac/26a3ac64-69e4-95ec-80ab-1f5a477537d2/859742042973_cover.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
     likesCount: '4.2M',
@@ -270,7 +270,7 @@ const INITIAL_SONGS = [
     artist: 'Kaifi Khalil',
     album: 'Kahani Suno (Official)',
     duration: 174,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview115/v4/78/23/75/78237534-1462-7779-165f-502bf22bed03/mzaf_15915982225370167762.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/ff/cc/7b/ffcc7bba-4005-f2c4-b1f1-3cc49a5e6283/artwork.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
     likesCount: '1.7M',
@@ -304,7 +304,7 @@ const INITIAL_SONGS = [
     artist: 'Diljit Dosanjh',
     album: 'MoonChild Era',
     duration: 198,
-    audioUrl: 'https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/38/d5/7a/38d57a99-39fc-e901-7c45-fa6260ec83c1/mzaf_8083696285926392389.plus.aac.p.m4a',
+    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
     albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/8a/89/e4/8a89e445-d2c6-f8ac-a828-27818b0c1afe/859749638209_cover.jpg/600x600bb.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
     likesCount: '2.4M',
@@ -1034,42 +1034,48 @@ export default function App() {
     setIsSearchingOnline(true)
 
     try {
-      const res = await fetch(`https://itunes.apple.com/search?term=${encodeURIComponent(term)}&media=music&entity=song&limit=25`)
+      const res = await fetch(`https://discoveryprovider.audius.co/v1/tracks/search?query=${encodeURIComponent(term)}&app_name=resso_music`)
         .then(r => r.ok ? r.json() : null)
         .catch(() => null)
 
-      if (res && Array.isArray(res.results)) {
-        const parsed = res.results.filter(t => t.previewUrl).map(t => ({
-          id: `track_${t.trackId}`,
-          title: t.trackName || 'Track',
-          artist: t.artistName || 'Artist',
-          album: t.collectionName || 'Official Track',
-          duration: Math.round(t.trackTimeMillis ? t.trackTimeMillis / 1000 : 210),
-          audioUrl: t.previewUrl,
-          albumArt: t.artworkUrl100 ? t.artworkUrl100.replace('100x100bb', '600x600bb') : currentSong.albumArt,
+      if (res && Array.isArray(res.data) && res.data.length > 0) {
+        const parsed = res.data.map(t => ({
+          id: `track_${t.id}`,
+          title: t.title || 'Track',
+          artist: t.user?.name || 'Artist',
+          album: 'Official Track',
+          duration: Math.round(t.duration || 210),
+          audioUrl: `https://discoveryprovider.audius.co/v1/tracks/${t.id}/stream?app_name=resso_music`,
+          albumArt: t.artwork?.['480x480'] || t.artwork?.['150x150'] || currentSong.albumArt,
           videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-          likesCount: '52.3K',
-          commentsCount: '1.1K',
+          likesCount: '45.2K',
+          commentsCount: '1.2K',
           bpm: '124 BPM',
           credits: {
-            composer: t.artistName,
-            lyricist: t.artistName,
+            composer: t.user?.name || 'Artist',
+            lyricist: t.user?.name || 'Artist',
             producer: 'Studio Release',
             releaseYear: '2024'
           },
           lyrics: [
-            { time: 0, text: `♪ ${t.trackName} ♪` },
-            { time: 4, text: `Artist: ${t.artistName}` },
+            { time: 0, text: `♪ ${t.title} ♪` },
+            { time: 4, text: `Artist: ${t.user?.name || 'Artist'}` },
             { time: 10, text: 'Streaming in High Fidelity Sound 🎧' },
             { time: 20, text: 'Feel the rhythm & acoustic vibrations... 🔥' }
           ],
-          genre: t.primaryGenreName || 'Music',
+          genre: t.genre || 'Music',
           mood: 'Vibrant',
           isLiked: false,
           isFollowing: false,
           isDownloaded: false
         }))
         setOnlineResults(parsed)
+      } else {
+        const localMatches = songs.filter(s =>
+          s.title.toLowerCase().includes(term.toLowerCase()) ||
+          s.artist.toLowerCase().includes(term.toLowerCase())
+        )
+        setOnlineResults(localMatches)
       }
     } catch (e) {
       console.warn("Search error:", e)
