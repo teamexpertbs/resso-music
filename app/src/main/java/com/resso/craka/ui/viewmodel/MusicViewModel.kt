@@ -334,18 +334,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleSongEnded() {
-        when (_repeatMode.value) {
-            2 -> restartCurrentSong()
-            1 -> playNextSong()
-            else -> {
-                val songs = currentQueue()
-                val index = songs.indexOfFirst { it.id == _currentSong.value?.id }
-                if (index in 0 until songs.lastIndex) {
-                    playNextSong()
-                } else {
-                    _isPlaying.value = false
-                }
-            }
+        if (_repeatMode.value == 2) {
+            restartCurrentSong()
+        } else {
+            playNextSong()
         }
     }
 
@@ -441,9 +433,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         autoPlay: Boolean = true,
         queue: List<SongEntity>? = null
     ) {
-        if (!queue.isNullOrEmpty()) {
-            playbackQueue.value = queue
+        val effectiveQueue = if (!queue.isNullOrEmpty()) {
+            queue
+        } else {
+            val fallback = (_trendingSongs.value + allSongs.value).filter { it.id != song.id }
+            listOf(song) + fallback
         }
+        playbackQueue.value = effectiveQueue
+
         viewModelScope.launch {
             // Save to database so it exists in Room and persists across app restarts
             val existing = repository.getSongById(song.id)
@@ -451,11 +448,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 repository.insertCustomSong(song)
             }
 
-            val allCurrent = allSongs.value
-            val existingIndex = allCurrent.indexOfFirst { it.id == song.id }
-            val indexToUse = if (existingIndex >= 0) existingIndex else allCurrent.size
+            val queueIndex = effectiveQueue.indexOfFirst { it.id == song.id }.let {
+                if (it >= 0) it else 0
+            }
 
-            selectSong(song, indexToUse, autoPlay = autoPlay)
+            selectSong(song, queueIndex, autoPlay = autoPlay, queue = effectiveQueue)
+
+            // Spotify Autoplay buffer: Pre-fetch upcoming similar tracks
+            ensureAutoplayQueue(song)
         }
     }
 
@@ -542,7 +542,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (!queue.isNullOrEmpty()) {
             playbackQueue.value = queue
         } else if (playbackQueue.value.none { it.id == song.id }) {
-            playbackQueue.value = allSongs.value.ifEmpty { listOf(song) }
+            val fallback = (_trendingSongs.value + allSongs.value).filter { it.id != song.id }; playbackQueue.value = listOf(song) + fallback
         }
         _currentSong.value = song
         _currentSongIndex.value = index
@@ -690,16 +690,73 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun playNextSong() {
         val songs = currentQueue()
-        if (songs.isEmpty()) return
-        val currentIndex = songs.indexOfFirst { it.id == _currentSong.value?.id }.let { found ->
+        if (songs.isEmpty()) {
+            viewModelScope.launch {
+                val trending = repository.getTrendingSongs()
+                if (trending.isNotEmpty()) {
+                    playbackQueue.value = trending
+                    selectSong(trending.first(), 0, autoPlay = true, queue = trending)
+                }
+            }
+            return
+        }
+
+        val currentId = _currentSong.value?.id
+        val currentIndex = songs.indexOfFirst { it.id == currentId }.let { found ->
             if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
         }
-        val nextIndex = if (_isShuffle.value) {
-            songs.indices.filter { it != currentIndex }.randomOrNull() ?: 0
-        } else {
-            (currentIndex + 1) % songs.size
+
+        // Spotify Autoplay: If single-song queue or reached end of queue, never replay the same song!
+        if (songs.size <= 1 || currentIndex >= songs.lastIndex) {
+            val candidate = (_trendingSongs.value + allSongs.value).firstOrNull { it.id != currentId && songs.none { s -> s.id == it.id } }
+                ?: (_trendingSongs.value + allSongs.value).firstOrNull { it.id != currentId }
+
+            if (candidate != null) {
+                val updatedQueue = (songs + candidate).distinctBy { it.id }
+                playbackQueue.value = updatedQueue
+                val newIndex = updatedQueue.indexOfFirst { it.id == candidate.id }
+                selectSong(candidate, newIndex, autoPlay = true, queue = updatedQueue)
+                ensureAutoplayQueue(candidate)
+                return
+            }
+
+            if (songs.size > 1 && _repeatMode.value == 1) {
+                selectSong(songs[0], 0, autoPlay = true, queue = songs)
+                return
+            }
+
+            _currentSong.value?.let { current ->
+                viewModelScope.launch {
+                    val freshTrending = repository.getTrendingSongs()
+                    val nextSong = freshTrending.firstOrNull { it.id != current.id }
+                    if (nextSong != null) {
+                        val newQueue = (songs + freshTrending).distinctBy { it.id }
+                        playbackQueue.value = newQueue
+                        val newIndex = newQueue.indexOfFirst { it.id == nextSong.id }
+                        selectSong(nextSong, newIndex, autoPlay = true, queue = newQueue)
+                        ensureAutoplayQueue(nextSong)
+                    } else if (songs.isNotEmpty()) {
+                        val nextIdx = (currentIndex + 1) % songs.size
+                        selectSong(songs[nextIdx], nextIdx, autoPlay = true, queue = songs)
+                    }
+                }
+            }
+            return
         }
-        selectSong(songs[nextIndex], nextIndex, autoPlay = true)
+
+        val nextIndex = if (_isShuffle.value) {
+            val candidates = songs.indices.filter { it != currentIndex }
+            candidates.randomOrNull() ?: ((currentIndex + 1) % songs.size)
+        } else {
+            currentIndex + 1
+        }
+
+        val nextSong = songs[nextIndex]
+        selectSong(nextSong, nextIndex, autoPlay = true, queue = songs)
+
+        if (nextIndex >= songs.size - 2) {
+            ensureAutoplayQueue(nextSong)
+        }
     }
 
     fun playPreviousSong() {
@@ -1065,5 +1122,63 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         PlaybackService.commands.onPrevious = null
         PlaybackService.commands.onSeek = null
         PlaybackService.stop(getApplication())
+    }
+
+    private var autoplayJob: Job? = null
+
+    private fun ensureAutoplayQueue(currentSong: SongEntity) {
+        autoplayJob?.cancel()
+        autoplayJob = viewModelScope.launch {
+            try {
+                val currentQueueList = playbackQueue.value
+                val existingIds = currentQueueList.map { it.id }.toSet()
+                val currentSongIndex = currentQueueList.indexOfFirst { it.id == currentSong.id }
+
+                val remainingCount = if (currentSongIndex >= 0) currentQueueList.size - currentSongIndex - 1 else 0
+                if (remainingCount >= 4) return@launch
+
+                val newTracks = mutableListOf<SongEntity>()
+
+                val cleanArtist = currentSong.artist
+                    .replace(Regex("(?i)ft\\.?|feat\\.?|&|,|official|audio|video|vevo"), " ")
+                    .trim()
+                if (cleanArtist.isNotBlank() && cleanArtist.length >= 3 && !cleanArtist.contains("unknown", ignoreCase = true)) {
+                    val artistTracks = repository.searchSongsOnline("$cleanArtist songs")
+                    for (track in artistTracks) {
+                        if (track.id !in existingIds && track.id != currentSong.id && newTracks.none { it.id == track.id }) {
+                            newTracks.add(track)
+                            if (newTracks.size >= 5) break
+                        }
+                    }
+                }
+
+                if (newTracks.size < 4) {
+                    val trending = if (_trendingSongs.value.isNotEmpty()) _trendingSongs.value else repository.getTrendingSongs()
+                    for (track in trending) {
+                        if (track.id !in existingIds && track.id != currentSong.id && newTracks.none { it.id == track.id }) {
+                            newTracks.add(track)
+                            if (newTracks.size >= 8) break
+                        }
+                    }
+                }
+
+                if (newTracks.size < 4) {
+                    for (track in allSongs.value) {
+                        if (track.id !in existingIds && track.id != currentSong.id && newTracks.none { it.id == track.id }) {
+                            newTracks.add(track)
+                            if (newTracks.size >= 8) break
+                        }
+                    }
+                }
+
+                if (newTracks.isNotEmpty()) {
+                    val updated = playbackQueue.value.toMutableList()
+                    updated.addAll(newTracks)
+                    playbackQueue.value = updated.distinctBy { it.id }
+                }
+            } catch (e: Exception) {
+                Log.w("MusicViewModel", "ensureAutoplayQueue: ${e.message}")
+            }
+        }
     }
 }
