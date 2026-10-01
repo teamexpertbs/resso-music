@@ -177,7 +177,7 @@ class MusicRepository(context: Context) {
                 artist = "Arijit Singh",
                 album = "Aashiqui 2",
                 durationMs = 262000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/77/59/c5/7759c5b2-b044-0e68-fea5-1fc4b84f312a/mzaf_3185920023072222766.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/2d/11/b9/2d11b994-b4fa-19eb-953d-70b472165e95/8903431566911_cover.jpg/600x600bb.jpg",
                 lyricsLrc = """
                     [00:00.00] (Gentle Piano & Acoustic Melody)
@@ -203,7 +203,7 @@ class MusicRepository(context: Context) {
                 artist = "Ali Sethi x Shae Gill",
                 album = "Coke Studio Season 14",
                 durationMs = 224000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview126/v4/62/33/1e/62331ea8-d1df-027d-fe75-ac16a519323d/mzaf_14381883946572745360.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/f3/f9/06/f3f906c3-79d5-ac9a-5fdd-262048f955f9/cover.jpg/600x600bb.jpg",
                 lyricsLrc = """
                     [00:00.00] (Agg laavan majboori nu)
@@ -225,7 +225,7 @@ class MusicRepository(context: Context) {
                 artist = "Arijit Singh & Sachin-Jigar",
                 album = "Bhediya",
                 durationMs = 261000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/eb/27/61/eb2761c7-d606-0912-dff0-2dc6b69974bd/mzaf_2023722930851223219.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/2e/0b/c0/2e0bc070-112f-a827-6ad8-6bc64f7caaff/840214460180.png/600x600bb.jpg",
                 lyricsLrc = """
                     [00:00.00] (Soft guitar strumming)
@@ -246,7 +246,7 @@ class MusicRepository(context: Context) {
                 artist = "Arijit Singh & Shilpa Rao",
                 album = "Jawan",
                 durationMs = 200000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/76/05/d9/7605d905-f631-517d-df7f-e162affcd414/mzaf_9976541859961700749.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/bb/f4/f5/bbf4f511-3c12-c25e-a475-b6d06faa8c13/8902894362047_cover.jpg/600x600bb.jpg",
                 lyricsLrc = """
                     [00:00.00] (Anirudh Beat Drop)
@@ -267,7 +267,7 @@ class MusicRepository(context: Context) {
                 artist = "AP Dhillon, Gurinder Gill",
                 album = "Brown Munde",
                 durationMs = 267000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/97/74/69/977469be-a9d5-35a7-80ad-ebe12a799ccc/mzaf_804867738726203367.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/26/a3/ac/26a3ac64-69e4-95ec-80ab-1f5a477537d2/859742042973_cover.jpg/600x600bb.jpg",
                 lyricsLrc = """
                     [00:00.00] (Trap Punjabi Beats)
@@ -289,7 +289,7 @@ class MusicRepository(context: Context) {
                 artist = "Arijit Singh, Pritam",
                 album = "Brahmastra",
                 durationMs = 268000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/44/26/50/442650b7-256e-034a-380a-4bbf16e59e53/mzaf_272051127111758324.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80",
                 lyricsLrc = """
                     [00:00.00] (Romantic Flute & Acoustic Intro)
@@ -314,7 +314,7 @@ class MusicRepository(context: Context) {
                 artist = "Sidhu Moose Wala",
                 album = "Moosetape",
                 durationMs = 270000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview221/v4/6c/2b/b5/6c2bb54c-cbb6-558e-87e6-cc750aa39c54/mzaf_11043876483606963092.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80",
                 lyricsLrc = """
                     [00:00.00] (Heavy 808 Punjabi Beat Drops)
@@ -339,7 +339,7 @@ class MusicRepository(context: Context) {
                 artist = "Diljit Dosanjh",
                 album = "MoonChild Era",
                 durationMs = 210000L,
-                audioUrl = "https://audio-ssl.itunes.apple.com/itunes-assets/AudioPreview211/v4/a9/82/78/a9827837-5ca7-1fe3-fc24-3dedeffb86e4/mzaf_4678729972431007397.plus.aac.p.m4a",
+                audioUrl = "",
                 albumArtUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
                 lyricsLrc = """
                     [00:00.00] (Synthesizer & Upbeat Pop Rhythm)
