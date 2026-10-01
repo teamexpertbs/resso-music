@@ -60,7 +60,7 @@ class MusicSearchService {
         if (playableSpotify.size >= 3) return@withContext playableSpotify
         val youtubeSongs = searchYouTubeSongs(trimmed, 6)
         val merged = (playableSpotify + youtubeSongs).distinctBy { it.id }
-        if (merged.isNotEmpty()) merged else searchItunesSongs(trimmed, 8)
+        merged
     }
 
     suspend fun getTrendingSongs(limit: Int = 6): List<SongEntity> = withContext(Dispatchers.IO) {
@@ -92,7 +92,7 @@ class MusicSearchService {
 
     suspend fun searchYouTubeSongs(query: String, limit: Int = 25): List<SongEntity> = withContext(Dispatchers.IO) {
         if (youtubeApiKey.isBlank()) {
-            Log.i(TAG, "YOUTUBE_API_KEY is not configured; using the iTunes fallback.")
+            Log.i(TAG, "YOUTUBE_API_KEY is not configured.")
             return@withContext emptyList()
         }
 
@@ -377,64 +377,6 @@ class MusicSearchService {
             .replace(Regex("""(?i)\b(official|video|audio|lyric|lyrics|full|song|hd|4k)\b"""), " ")
             .replace(Regex("[^a-z0-9]+"), " ")
             .trim()
-    }
-
-    suspend fun searchItunesSongs(query: String, limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {
-        try {
-            val encoded = URLEncoder.encode(query, "UTF-8")
-            val url = "https://itunes.apple.com/search?term=$encoded&entity=song&media=music&limit=$limit"
-            val request = Request.Builder()
-                .url(url)
-                .header("User-Agent", "RessoMusicApp/1.0 (Android)")
-                .build()
-
-            val (code, bodyString) = fetchText(request)
-            if (code !in 200..299 || bodyString == null) return@withContext emptyList()
-            val json = JSONObject(bodyString)
-            val resultsArray = json.optJSONArray("results") ?: return@withContext emptyList()
-
-            val songs = mutableListOf<SongEntity>()
-            for (i in 0 until resultsArray.length()) {
-                val item = resultsArray.getJSONObject(i)
-                val trackId = item.optLong("trackId", 0L)
-                val trackName = item.optString("trackName", "")
-                val artistName = item.optString("artistName", "Unknown Artist")
-                val collectionName = item.optString("collectionName", "Single")
-                val previewUrl = item.optString("previewUrl", "")
-                val artwork100 = item.optString("artworkUrl100", "")
-                val artworkHighRes = if (artwork100.isNotEmpty()) {
-                    artwork100.replace("100x100bb", "600x600bb")
-                } else {
-                    "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80"
-                }
-                val durationMs = item.optLong("trackTimeMillis", 180000L)
-                val primaryGenre = item.optString("primaryGenreName", "Pop")
-
-                if (trackName.isNotEmpty() && previewUrl.isNotEmpty()) {
-                    val mood = mapTextToMood("$primaryGenre $trackName")
-                    songs.add(
-                        SongEntity(
-                            id = "online_$trackId",
-                            title = trackName,
-                            artist = artistName,
-                            album = collectionName,
-                            durationMs = durationMs,
-                            audioUrl = previewUrl,
-                            albumArtUrl = artworkHighRes,
-                            lyricsLrc = "",
-                            genre = primaryGenre,
-                            mood = mood,
-                            isLiked = false,
-                            isCustomUpload = false
-                        )
-                    )
-                }
-            }
-            songs
-        } catch (e: Exception) {
-            Log.e("MusicSearchService", "iTunes search error: ${e.message}", e)
-            emptyList()
-        }
     }
 
     suspend fun fetchSyncedLyrics(artist: String, title: String): String? = withContext(Dispatchers.IO) {
