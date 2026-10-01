@@ -94,4 +94,4 @@ jobs:
             **Download `Resso-Music.apk` below and install directly on your phone!**
           files: output_apk/Resso-Music.apk
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUBTOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
