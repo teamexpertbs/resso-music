@@ -63,7 +63,6 @@ import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.resso.craka.data.model.VibeEntity
 import com.resso.craka.ui.explore.SongListItem
 import com.resso.craka.ui.theme.RessoBackground
 import com.resso.craka.ui.theme.RessoCardBg
@@ -79,13 +78,11 @@ import com.resso.craka.util.LyricsParser
 fun LibraryScreen(
     viewModel: MusicViewModel,
     onSongSelected: () -> Unit,
-    onOpenVibeCreator: () -> Unit,
     onOpenSidebar: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val likedSongs by viewModel.likedSongs.collectAsState()
-    val allVibes by viewModel.allVibes.collectAsState()
     val allPlaylists by viewModel.allPlaylists.collectAsState()
     val allSongs by viewModel.allSongs.collectAsState()
     val currentSong by viewModel.currentSong.collectAsState()
@@ -97,7 +94,7 @@ fun LibraryScreen(
     var newPlaylistTitle by remember { mutableStateOf("") }
 
     val recentSongs by viewModel.recentSongs.collectAsState()
-    val tabTitles = listOf("Liked", "Recent", "Playlists", "Vibes")
+    val tabTitles = listOf("Liked", "Recent", "Playlists")
 
     Column(
         modifier = modifier
@@ -145,15 +142,15 @@ fun LibraryScreen(
             }
 
             IconButton(
-                onClick = onOpenVibeCreator,
+                onClick = { isNewPlaylistDialogOpen = true },
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(RessoPrimary)
-                    .testTag("library_create_vibe_button")
+                    .background(Color.White.copy(alpha = 0.08f))
+                    .testTag("library_new_playlist_button")
             ) {
                 Icon(
-                    imageVector = Icons.Default.AutoAwesome,
-                    contentDescription = "Create Vibe",
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "New Playlist",
                     tint = Color.White
                 )
             }
@@ -239,61 +236,6 @@ fun LibraryScreen(
                                 },
                                 onToggleLike = { viewModel.toggleLikeSong(song) },
                                 onAddToQueue = { viewModel.addToQueue(song) }
-                            )
-                        }
-                    }
-                }
-            }
-            3 -> {
-                // Created Vibes (from Room database)
-                if (allVibes.isEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(bottom = 60.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Icon(
-                                imageVector = Icons.Default.Movie,
-                                contentDescription = null,
-                                tint = RessoSecondary,
-                                modifier = Modifier.size(56.dp)
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "No Custom Vibes Created",
-                                color = Color.White,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 16.sp
-                            )
-                            Text(
-                                text = "Trim a video from gallery to create your first Vibe background!",
-                                color = RessoTextSecondary,
-                                fontSize = 12.sp
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-                            Button(
-                                onClick = onOpenVibeCreator,
-                                colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary),
-                                shape = RoundedCornerShape(12.dp)
-                            ) {
-                                Icon(imageVector = Icons.Default.Add, contentDescription = null)
-                                Spacer(modifier = Modifier.width(6.dp))
-                                Text("Create Vibe Now")
-                            }
-                        }
-                    }
-                } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        items(allVibes, key = { it.id }) { vibe ->
-                            CreatedVibeCard(
-                                vibe = vibe,
-                                onApply = {
-                                    viewModel.applyVibeToCurrent(vibe)
-                                    Toast.makeText(context, "Applied '${vibe.title}' to player!", Toast.LENGTH_SHORT).show()
-                                    onSongSelected()
-                                }
                             )
                         }
                     }
@@ -509,70 +451,6 @@ fun LibraryScreen(
                 }
             }
         )
-    }
-}
-
-@Composable
-fun CreatedVibeCard(
-    vibe: VibeEntity,
-    onApply: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(14.dp),
-        colors = CardDefaults.cardColors(containerColor = RessoSurface),
-        modifier = Modifier.fillMaxWidth()
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Box(
-                modifier = Modifier
-                    .size(54.dp)
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(RessoCardBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Movie,
-                    contentDescription = null,
-                    tint = RessoSecondary,
-                    modifier = Modifier.size(28.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.width(12.dp))
-
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = vibe.title,
-                    fontWeight = FontWeight.Bold,
-                    color = Color.White,
-                    fontSize = 15.sp
-                )
-                Text(
-                    text = "Trim: ${LyricsParser.formatTime(vibe.startTrimMs)} - ${LyricsParser.formatTime(vibe.endTrimMs)} • ${vibe.filterType}",
-                    color = RessoTextSecondary,
-                    fontSize = 12.sp
-                )
-                Text(
-                    text = "Created by ${vibe.creatorName}",
-                    color = RessoSecondary,
-                    fontSize = 10.sp
-                )
-            }
-
-            Button(
-                onClick = onApply,
-                colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary),
-                shape = RoundedCornerShape(10.dp),
-                modifier = Modifier.height(36.dp)
-            ) {
-                Text("Apply", fontSize = 12.sp, fontWeight = FontWeight.Bold)
-            }
-        }
     }
 }
 

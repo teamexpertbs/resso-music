@@ -88,7 +88,6 @@ import com.resso.craka.ui.theme.RessoPrimary
 import com.resso.craka.ui.theme.RessoSecondary
 import com.resso.craka.ui.theme.RessoSurface
 import com.resso.craka.ui.theme.RessoTextSecondary
-import com.resso.craka.ui.vibe.VibeCreatorScreen
 import com.resso.craka.ui.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
 
@@ -134,7 +133,7 @@ class MainActivity : ComponentActivity() {
                     }
                 }
 
-                var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library", "vibe_creator"
+                var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library"
                 val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
                 val coroutineScope = rememberCoroutineScope()
 
@@ -145,7 +144,7 @@ class MainActivity : ComponentActivity() {
 
                 ModalNavigationDrawer(
                     drawerState = drawerState,
-                    gesturesEnabled = currentTab != "vibe_creator",
+                    gesturesEnabled = true,
                     drawerContent = {
                         ModalDrawerSheet(
                             drawerContainerColor = RessoBackground,
@@ -161,10 +160,6 @@ class MainActivity : ComponentActivity() {
                                     currentTab = tab
                                     coroutineScope.launch { drawerState.close() }
                                 },
-                                onOpenVibeCreator = {
-                                    currentTab = "vibe_creator"
-                                    coroutineScope.launch { drawerState.close() }
-                                },
                                 onCloseDrawer = {
                                     coroutineScope.launch { drawerState.close() }
                                 }
@@ -174,8 +169,7 @@ class MainActivity : ComponentActivity() {
                 ) {
                     Scaffold(
                         bottomBar = {
-                            if (currentTab != "vibe_creator") {
-                                Column {
+                            Column {
                                     // Mini player bar when navigating outside the main For You player
                                     if (currentTab != "foryou" && currentSong != null) {
                                         MiniPlayerBar(
@@ -264,7 +258,6 @@ class MainActivity : ComponentActivity() {
                                         )
                                     }
                                 }
-                            }
                         },
                         containerColor = RessoBackground,
                         modifier = Modifier.fillMaxSize()
@@ -272,7 +265,7 @@ class MainActivity : ComponentActivity() {
                         Box(
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(bottom = if (currentTab == "vibe_creator") 0.dp else innerPadding.calculateBottomPadding())
+                                .padding(bottom = innerPadding.calculateBottomPadding())
                         ) {
                             val streamVisible by musicViewModel.streamVisible.collectAsState()
                             if (streamVisible) {
@@ -290,7 +283,6 @@ class MainActivity : ComponentActivity() {
                                 "foryou" -> {
                                     VibePlayerScreen(
                                         viewModel = musicViewModel,
-                                        onOpenVibeCreator = { currentTab = "vibe_creator" },
                                         onNavigateToSearch = { currentTab = "explore" },
                                         onOpenArtist = { artist ->
                                             currentTab = "explore"
@@ -310,14 +302,7 @@ class MainActivity : ComponentActivity() {
                                     LibraryScreen(
                                         viewModel = musicViewModel,
                                         onSongSelected = { currentTab = "foryou" },
-                                        onOpenVibeCreator = { currentTab = "vibe_creator" },
                                         onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
-                                    )
-                                }
-                                "vibe_creator" -> {
-                                    VibeCreatorScreen(
-                                        viewModel = musicViewModel,
-                                        onNavigateBack = { currentTab = "foryou" }
                                     )
                                 }
                             }

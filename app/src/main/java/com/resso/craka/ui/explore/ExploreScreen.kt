@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -20,6 +21,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -60,7 +62,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -100,6 +101,14 @@ fun ExploreScreen(
     var searchKeyword by remember { mutableStateOf("") }
     var selectedMood by remember { mutableStateOf<String?>(null) }
     val focusManager = LocalFocusManager.current
+    val listState = rememberLazyListState()
+
+    // Dismiss keyboard when user scrolls the content
+    LaunchedEffect(listState.isScrollInProgress) {
+        if (listState.isScrollInProgress) {
+            focusManager.clearFocus()
+        }
+    }
 
     // Debounced automatic search while typing
     LaunchedEffect(pendingSearch) {
@@ -112,7 +121,7 @@ fun ExploreScreen(
 
     LaunchedEffect(searchKeyword) {
         if (searchKeyword.isNotBlank()) {
-            delay(700)
+            delay(500)
             viewModel.searchMusic(searchKeyword)
         }
     }
@@ -153,21 +162,27 @@ fun ExploreScreen(
             .fillMaxSize()
             .background(RessoBackground)
             .statusBarsPadding()
-            .padding(horizontal = 16.dp, vertical = 10.dp)
+            .padding(horizontal = 16.dp, vertical = 6.dp)
+            .imePadding()
             .testTag("explore_screen")
     ) {
-        // Header with Sidebar opener
+        // Pinned Header with Sidebar opener
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Search",
-                    style = MaterialTheme.typography.headlineMedium,
+                    text = "Explore & Search",
+                    style = MaterialTheme.typography.headlineSmall,
                     fontWeight = FontWeight.Bold,
                     color = Color.White
+                )
+                Text(
+                    text = "Discover songs, artists & trending hits",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = RessoTextSecondary
                 )
             }
 
@@ -187,13 +202,13 @@ fun ExploreScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(8.dp))
 
         // Search Bar with IME search
         OutlinedTextField(
             value = searchKeyword,
             onValueChange = { searchKeyword = it },
-            placeholder = { Text("Songs, artists, or lyrics", color = RessoTextSecondary, fontSize = 13.sp) },
+            placeholder = { Text("Search songs, artists, or lyrics...", color = RessoTextSecondary, fontSize = 13.sp) },
             leadingIcon = {
                 Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = RessoPrimary)
             },
@@ -215,7 +230,9 @@ fun ExploreScreen(
             keyboardActions = KeyboardActions(
                 onSearch = {
                     focusManager.clearFocus()
-                    viewModel.searchMusic(searchKeyword)
+                    if (searchKeyword.isNotBlank()) {
+                        viewModel.searchMusic(searchKeyword)
+                    }
                 }
             ),
             colors = OutlinedTextFieldDefaults.colors(
@@ -231,240 +248,287 @@ fun ExploreScreen(
                 .testTag("explore_search_input")
         )
 
-        if (searchHistory.isNotEmpty() && searchKeyword.isBlank()) {
-            Spacer(modifier = Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                searchHistory.forEach { query ->
+        Spacer(modifier = Modifier.height(10.dp))
+
+        // Single Unified Scrollable LazyColumn - everything scrolls smoothly together!
+        LazyColumn(
+            state = listState,
+            verticalArrangement = Arrangement.spacedBy(10.dp),
+            modifier = Modifier
+                .fillMaxSize()
+                .weight(1f)
+        ) {
+            // Search History Chips (only when searchKeyword is blank)
+            if (searchHistory.isNotEmpty() && searchKeyword.isBlank()) {
+                item(key = "search_history_row") {
+                    Column {
+                        Text(
+                            text = "Recent Searches",
+                            color = RessoTextSecondary,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            modifier = Modifier.padding(bottom = 6.dp)
+                        )
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .horizontalScroll(rememberScrollState()),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            searchHistory.forEach { query ->
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(18.dp))
+                                        .background(RessoCardBg)
+                                        .clickable {
+                                            searchKeyword = query
+                                            focusManager.clearFocus()
+                                            viewModel.searchMusic(query)
+                                        }
+                                        .padding(horizontal = 12.dp, vertical = 7.dp)
+                                ) {
+                                    Text(text = query, color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Quick Trending Artist & Genre Suggestion Chips
+            item(key = "quick_tags_row") {
+                Column {
+                    Text(
+                        text = "Popular Categories",
+                        color = RessoTextSecondary,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.padding(bottom = 6.dp)
+                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        quickSearchTags.forEach { tag ->
+                            val cleanQuery = tag.substringAfter(" ").trim()
+                            val isSelected = searchKeyword.equals(cleanQuery, ignoreCase = true)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(18.dp))
+                                    .background(if (isSelected) RessoPrimary else RessoCardBg)
+                                    .clickable {
+                                        searchKeyword = cleanQuery
+                                        focusManager.clearFocus()
+                                        viewModel.searchMusic(cleanQuery)
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 7.dp)
+                            ) {
+                                Text(
+                                    text = tag,
+                                    color = if (isSelected) Color.White else RessoTextSecondary,
+                                    fontSize = 12.sp,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Mood Filter Chips
+            item(key = "mood_chips_row") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    moods.forEach { mood ->
+                        val isSelected = (mood == "All" && selectedMood == null) || (selectedMood == mood)
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isSelected) RessoSecondary.copy(alpha = 0.25f) else Color.Transparent)
+                                .border(
+                                    width = 1.dp,
+                                    color = if (isSelected) RessoSecondary else RessoCardBg,
+                                    shape = RoundedCornerShape(16.dp)
+                                )
+                                .clickable {
+                                    selectedMood = if (mood == "All") null else mood
+                                }
+                                .padding(horizontal = 12.dp, vertical = 6.dp)
+                                .testTag("mood_chip_$mood")
+                        ) {
+                            Text(
+                                text = mood,
+                                color = if (isSelected) RessoSecondary else RessoTextSecondary,
+                                fontSize = 12.sp,
+                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                            )
+                        }
+                    }
+                }
+            }
+
+            // When search query is blank: show Home Rows (Carousels) smoothly in the scrollable view
+            if (searchKeyword.isBlank() && homeRows.isNotEmpty()) {
+                items(homeRows, key = { it.first }) { (title, songs) ->
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Text(
+                            text = title,
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(songs.size) { index ->
+                                val song = songs[index]
+                                Column(
+                                    modifier = Modifier
+                                        .width(112.dp)
+                                        .clickable {
+                                            viewModel.playSongFromAnywhere(song, autoPlay = true, queue = songs)
+                                            onSongSelected()
+                                        }
+                                ) {
+                                    AlbumArtwork(
+                                        songId = song.id,
+                                        albumArtUrl = song.albumArtUrl,
+                                        contentDescription = song.title,
+                                        modifier = Modifier
+                                            .size(112.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                    )
+                                    Text(
+                                        text = song.title,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        color = RessoTextSecondary,
+                                        fontSize = 11.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Results Section Title
+            item(key = "results_header") {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 4.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    val titleText = if (searchKeyword.isNotBlank()) {
+                        "Results for \"$searchKeyword\" (${displaySongs.size})"
+                    } else {
+                        "Trending Songs (${displaySongs.size})"
+                    }
+                    Text(
+                        text = titleText,
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White
+                    )
+
+                    if (isSearching) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            CircularProgressIndicator(
+                                color = RessoPrimary,
+                                modifier = Modifier.size(16.dp),
+                                strokeWidth = 2.dp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "Searching...", color = RessoPrimary, fontSize = 12.sp)
+                        }
+                    }
+                }
+            }
+
+            // Loading / Empty / Songs List
+            if (isSearching && displaySongs.isEmpty()) {
+                item(key = "searching_loader") {
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(18.dp))
-                            .background(RessoCardBg)
-                            .clickable {
-                                searchKeyword = query
-                                focusManager.clearFocus()
-                            }
-                            .padding(horizontal = 12.dp, vertical = 7.dp)
+                            .fillMaxWidth()
+                            .padding(vertical = 40.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(text = query, color = Color.White, fontSize = 12.sp)
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Quick Suggestion Chips (Popular Searches)
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            quickSearchTags.forEach { tag ->
-                val cleanQuery = tag.substringAfter(" ").trim()
-                val isSelected = searchKeyword.equals(cleanQuery, ignoreCase = true)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(if (isSelected) RessoPrimary else RessoCardBg)
-                        .clickable {
-                            searchKeyword = cleanQuery
-                            focusManager.clearFocus()
-                            viewModel.searchMusic(cleanQuery)
-                        }
-                        .padding(horizontal = 12.dp, vertical = 7.dp)
-                ) {
-                    Text(
-                        text = tag,
-                        color = if (isSelected) Color.White else RessoTextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(10.dp))
-
-        // Mood Filter Chips
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            moods.forEach { mood ->
-                val isSelected = (mood == "All" && selectedMood == null) || (selectedMood == mood)
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(16.dp))
-                        .background(if (isSelected) RessoSecondary.copy(alpha = 0.25f) else Color.Transparent)
-                        .border(
-                            width = 1.dp,
-                            color = if (isSelected) RessoSecondary else RessoCardBg,
-                            shape = RoundedCornerShape(16.dp)
-                        )
-                        .clickable {
-                            selectedMood = if (mood == "All") null else mood
-                        }
-                        .padding(horizontal = 12.dp, vertical = 6.dp)
-                        .testTag("mood_chip_$mood")
-                ) {
-                    Text(
-                        text = mood,
-                        color = if (isSelected) RessoSecondary else RessoTextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
-
-        // Results Section Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            val titleText = if (searchKeyword.isNotBlank()) {
-                "Results for \"$searchKeyword\" (${displaySongs.size})"
-            } else {
-                "Trending (${displaySongs.size})"
-            }
-            Text(
-                text = titleText,
-                style = MaterialTheme.typography.titleMedium,
-                fontWeight = FontWeight.Bold,
-                color = Color.White
-            )
-
-            if (isSearching) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    CircularProgressIndicator(
-                        color = RessoPrimary,
-                        modifier = Modifier.size(16.dp),
-                        strokeWidth = 2.dp
-                    )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(text = "Searching...", color = RessoPrimary, fontSize = 12.sp)
-                }
-            }
-        }
-
-        if (searchKeyword.isBlank() && homeRows.isNotEmpty()) {
-            Spacer(modifier = Modifier.height(8.dp))
-            homeRows.forEach { (title, songs) ->
-                Text(text = title, color = Color.White, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-                Spacer(modifier = Modifier.height(8.dp))
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                    items(songs.size) { index ->
-                        val song = songs[index]
-                        Column(
-                            modifier = Modifier
-                                .width(112.dp)
-                                .clickable {
-                                    viewModel.playSongFromAnywhere(song, autoPlay = true, queue = songs)
-                                    onSongSelected()
-                                }
-                        ) {
-                            AlbumArtwork(
-                                songId = song.id,
-                                albumArtUrl = song.albumArtUrl,
-                                contentDescription = song.title,
-                                modifier = Modifier
-                                    .size(112.dp)
-                                    .clip(RoundedCornerShape(8.dp))
-                            )
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                            CircularProgressIndicator(color = RessoPrimary)
+                            Spacer(modifier = Modifier.height(14.dp))
                             Text(
-                                text = song.title,
+                                text = "Searching online & local tracks...",
                                 color = Color.White,
-                                fontSize = 12.sp,
-                                maxLines = 1,
-                                modifier = Modifier.padding(top = 6.dp)
+                                fontWeight = FontWeight.Medium
                             )
                         }
                     }
                 }
-                Spacer(modifier = Modifier.height(14.dp))
-            }
-        }
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        // Content Area
-        if (isSearching && displaySongs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    CircularProgressIndicator(color = RessoPrimary)
-                    Spacer(modifier = Modifier.height(14.dp))
-                    Text(
-                        text = "Searching online & local songs...",
-                        color = Color.White,
-                        fontWeight = FontWeight.Medium
-                    )
-                }
-            }
-        } else if (displaySongs.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier.padding(24.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = RessoTextSecondary,
-                        modifier = Modifier.size(56.dp)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = if (searchKeyword.isNotBlank()) "No songs found for \"$searchKeyword\"" else "No songs found in this mood",
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text = "Try searching for popular artists like Arijit Singh, Sidhu Moose Wala, or Diljit Dosanjh",
-                        color = RessoTextSecondary,
-                        fontSize = 13.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Button(
-                        onClick = {
-                            searchKeyword = "Arijit Singh"
-                            viewModel.searchMusic("Arijit Singh")
-                        },
-                        colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary),
-                        shape = RoundedCornerShape(20.dp)
+            } else if (displaySongs.isEmpty()) {
+                item(key = "empty_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text("Search Arijit Singh", fontSize = 13.sp)
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.MusicNote,
+                                contentDescription = null,
+                                tint = RessoTextSecondary,
+                                modifier = Modifier.size(52.dp)
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Text(
+                                text = if (searchKeyword.isNotBlank()) "No songs found for \"$searchKeyword\"" else "No songs in this mood",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 16.sp
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Try searching for popular artists like Arijit Singh, Sidhu Moose Wala, or Diljit Dosanjh",
+                                color = RessoTextSecondary,
+                                fontSize = 13.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Button(
+                                onClick = {
+                                    searchKeyword = "Arijit Singh"
+                                    focusManager.clearFocus()
+                                    viewModel.searchMusic("Arijit Singh")
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Icon(imageVector = Icons.Default.Search, contentDescription = null, modifier = Modifier.size(16.dp))
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Text("Search Arijit Singh", fontSize = 13.sp)
+                            }
+                        }
                     }
                 }
-            }
-        } else {
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-                modifier = Modifier.weight(1f)
-            ) {
+            } else {
                 itemsIndexed(displaySongs, key = { _, song -> song.id }) { _, song ->
                     val isPlayingThis = currentSong?.id == song.id
                     SongListItem(
@@ -481,6 +545,10 @@ fun ExploreScreen(
                         isOnline = song.id.startsWith("online_")
                     )
                 }
+            }
+
+            item(key = "bottom_spacer") {
+                Spacer(modifier = Modifier.height(30.dp))
             }
         }
     }

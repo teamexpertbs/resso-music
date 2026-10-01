@@ -117,7 +117,6 @@ import kotlinx.coroutines.launch
 @Composable
 fun VibePlayerScreen(
     viewModel: MusicViewModel,
-    onOpenVibeCreator: () -> Unit,
     onNavigateToSearch: () -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
     onOpenSidebar: () -> Unit = {},

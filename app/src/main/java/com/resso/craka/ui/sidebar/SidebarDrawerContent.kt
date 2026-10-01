@@ -26,25 +26,23 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Explore
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatQuote
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.Headphones
 import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.Movie
 import androidx.compose.material.icons.filled.MusicNote
 import androidx.compose.material.icons.filled.MusicVideo
-import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Divider
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -54,8 +52,8 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
@@ -63,7 +61,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.resso.craka.ui.components.AlbumArtwork
-import com.resso.craka.ui.theme.RessoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoGreen
 import com.resso.craka.ui.theme.RessoPrimary
@@ -78,7 +75,6 @@ fun SidebarDrawerContent(
     viewModel: MusicViewModel,
     currentTab: String,
     onNavigateToTab: (String) -> Unit,
-    onOpenVibeCreator: () -> Unit,
     onCloseDrawer: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -87,8 +83,6 @@ fun SidebarDrawerContent(
     val isPlaying by viewModel.isPlaying.collectAsState()
     val isFlashSync by viewModel.isFlashSyncEnabled.collectAsState()
     val isVolumeBooster by viewModel.isVolumeBoosterEnabled.collectAsState()
-    val currentVibeFilter by viewModel.currentVibeFilter.collectAsState()
-    val currentVibeUri by viewModel.currentVibeUri.collectAsState()
 
     // Camera permission for Flash Torch
     val cameraPermissionLauncher = rememberLauncherForActivityResult(
@@ -98,19 +92,17 @@ fun SidebarDrawerContent(
             viewModel.toggleFlashSync()
             Toast.makeText(
                 context,
-                "⚡ Beat Flash: ON (Flashlight song ke beat par chalegi)",
+                "⚡ Beat Flash: ON (Flashlight pulses to the beat)",
                 Toast.LENGTH_SHORT
             ).show()
         } else {
             Toast.makeText(
                 context,
-                "Flashlight ke liye Camera permission zaroori hai",
+                "Flashlight requires Camera permission",
                 Toast.LENGTH_LONG
             ).show()
         }
     }
-
-    val availableFilters = listOf("Neon", "Retro", "Disco", "Cyberpunk", "Ambient", "Glitch")
 
     Column(
         modifier = modifier
@@ -130,30 +122,35 @@ fun SidebarDrawerContent(
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(40.dp)
                         .clip(CircleShape)
-                        .background(RessoPrimary),
+                        .background(
+                            Brush.linearGradient(
+                                listOf(RessoPrimary, RessoSecondary)
+                            )
+                        ),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
                         imageVector = Icons.Default.MusicNote,
                         contentDescription = null,
                         tint = Color.White,
-                        modifier = Modifier.size(20.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                 }
-                Spacer(modifier = Modifier.width(10.dp))
+                Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Resso Tools",
-                        fontSize = 18.sp,
+                        text = "Resso Music",
+                        fontSize = 19.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
                     Text(
-                        text = "Vibe, Flash & Audio Booster",
+                        text = "ByteDance Edition • VIP Active",
                         fontSize = 11.sp,
-                        color = RessoTextSecondary
+                        color = RessoSecondary,
+                        fontWeight = FontWeight.SemiBold
                     )
                 }
             }
@@ -172,6 +169,63 @@ fun SidebarDrawerContent(
 
         Spacer(modifier = Modifier.height(16.dp))
 
+        // VIP Membership Banner
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = Color.Transparent),
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(
+                    width = 1.dp,
+                    brush = Brush.linearGradient(listOf(RessoPrimary.copy(alpha = 0.6f), RessoSecondary.copy(alpha = 0.6f))),
+                    shape = RoundedCornerShape(16.dp)
+                )
+                .background(
+                    brush = Brush.horizontalGradient(
+                        listOf(Color(0xFF2E0854), Color(0xFF130924))
+                    ),
+                    shape = RoundedCornerShape(16.dp)
+                )
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(40.dp)
+                        .clip(CircleShape)
+                        .background(RessoPrimary.copy(alpha = 0.2f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Headphones,
+                        contentDescription = null,
+                        tint = RessoPrimary,
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column {
+                    Text(
+                        text = "✨ Resso VIP Premium",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Lossless 320kbps • Ad-Free • Unlimited Skips",
+                        color = Color.White.copy(alpha = 0.7f),
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
         // Currently Playing Mini Banner
         if (currentSong != null) {
             Card(
@@ -181,6 +235,7 @@ fun SidebarDrawerContent(
                     .fillMaxWidth()
                     .clickable {
                         onNavigateToTab("foryou")
+                        onCloseDrawer()
                     }
             ) {
                 Row(
@@ -191,7 +246,7 @@ fun SidebarDrawerContent(
                 ) {
                     Box(
                         modifier = Modifier
-                            .size(46.dp)
+                            .size(48.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(Color.DarkGray)
                     ) {
@@ -252,143 +307,14 @@ fun SidebarDrawerContent(
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(14.dp))
         }
 
         HorizontalDivider(color = Color.White.copy(alpha = 0.08f), thickness = 1.dp)
 
         Spacer(modifier = Modifier.height(16.dp))
 
-        // SECTION 1: VIBE STUDIO (VIBE)
-        Text(
-            text = "✨ VIBE STUDIO",
-            fontSize = 11.sp,
-            fontWeight = FontWeight.ExtraBold,
-            color = RessoSecondary,
-            letterSpacing = 1.5.sp
-        )
-        Spacer(modifier = Modifier.height(8.dp))
-
-        Card(
-            shape = RoundedCornerShape(14.dp),
-            colors = CardDefaults.cardColors(containerColor = RessoCardBg),
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Column(modifier = Modifier.padding(14.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = "Custom Video Vibe",
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            fontSize = 14.sp
-                        )
-                        Text(
-                            text = if (currentVibeUri != null) "Custom video attached" else "Default ambient motion",
-                            color = RessoTextSecondary,
-                            fontSize = 12.sp
-                        )
-                    }
-
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(16.dp))
-                            .background(RessoSecondary)
-                            .clickable(onClick = onOpenVibeCreator)
-                            .padding(horizontal = 12.dp, vertical = 6.dp)
-                            .testTag("sidebar_open_vibe_creator")
-                    ) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Icon(
-                                imageVector = Icons.Default.AutoAwesome,
-                                contentDescription = null,
-                                tint = Color.Black,
-                                modifier = Modifier.size(14.dp)
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Text(
-                                text = "Create",
-                                color = Color.Black,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(12.dp))
-
-                // Vibe Filters Row
-                Text(
-                    text = "Vibe Visual Filter:",
-                    fontSize = 11.sp,
-                    color = RessoTextSecondary
-                )
-                Spacer(modifier = Modifier.height(6.dp))
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .horizontalScroll(rememberScrollState()),
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    availableFilters.forEach { filter ->
-                        val isSelected = currentVibeFilter.equals(filter, ignoreCase = true)
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isSelected) RessoSecondary else Color.White.copy(alpha = 0.08f))
-                                .clickable {
-                                    viewModel.setVibeFilter(filter)
-                                }
-                                .padding(horizontal = 10.dp, vertical = 5.dp)
-                                .testTag("sidebar_filter_$filter")
-                        ) {
-                            Text(
-                                text = filter,
-                                color = if (isSelected) Color.Black else Color.White,
-                                fontSize = 11.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        }
-                    }
-                }
-
-                if (currentVibeUri != null) {
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .clickable {
-                                viewModel.clearVibeVideo()
-                                Toast.makeText(context, "Default Vibe restored", Toast.LENGTH_SHORT).show()
-                            },
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Refresh,
-                            contentDescription = null,
-                            tint = RessoTextSecondary,
-                            modifier = Modifier.size(14.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "Reset to Default Video Vibe",
-                            color = RessoTextSecondary,
-                            fontSize = 11.sp
-                        )
-                    }
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // SECTION 2: BEAT FLASH SYNC (FLASH)
+        // SECTION 1: BEAT FLASH SYNC (Signature Resso Feature)
         Text(
             text = "⚡ BEAT FLASH SYNC",
             fontSize = 11.sp,
@@ -439,7 +365,7 @@ fun SidebarDrawerContent(
                             fontSize = 14.sp
                         )
                         Text(
-                            text = if (isFlashSync) "Flashing to song rhythm" else "Torch off",
+                            text = if (isFlashSync) "Pulsing with song beats" else "Torch off",
                             color = if (isFlashSync) RessoGreen else RessoTextSecondary,
                             fontSize = 12.sp
                         )
@@ -475,11 +401,11 @@ fun SidebarDrawerContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // SECTION 3: VOLUME BOOSTER (BOOST)
+        // SECTION 2: VOLUME BOOSTER (+150%)
         Text(
-            text = "🔊 VOLUME BOOSTER",
+            text = "🔊 SOUND ENHANCEMENT",
             fontSize = 11.sp,
             fontWeight = FontWeight.ExtraBold,
             color = RessoPrimary,
@@ -528,7 +454,7 @@ fun SidebarDrawerContent(
                             fontSize = 14.sp
                         )
                         Text(
-                            text = if (isVolumeBooster) "Supercharged audio gain" else "Normal standard gain",
+                            text = if (isVolumeBooster) "Supercharged audio gain active" else "Normal gain",
                             color = if (isVolumeBooster) RessoPrimary else RessoTextSecondary,
                             fontSize = 12.sp
                         )
@@ -556,9 +482,9 @@ fun SidebarDrawerContent(
             }
         }
 
-        Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(14.dp))
 
-        // SECTION 4: LYRIC POSTER CREATOR
+        // SECTION 3: LYRIC POSTER CREATOR
         Text(
             text = "📜 LYRIC POSTER",
             fontSize = 11.sp,
@@ -618,6 +544,60 @@ fun SidebarDrawerContent(
             }
         }
 
+        Spacer(modifier = Modifier.height(18.dp))
+
+        // SECTION 4: STREAMING QUALITY & AUDIO ENGINE
+        Text(
+            text = "📶 STREAMING QUALITY",
+            fontSize = 11.sp,
+            fontWeight = FontWeight.ExtraBold,
+            color = RessoSecondary,
+            letterSpacing = 1.5.sp
+        )
+        Spacer(modifier = Modifier.height(8.dp))
+
+        Card(
+            shape = RoundedCornerShape(14.dp),
+            colors = CardDefaults.cardColors(containerColor = RessoCardBg),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(CircleShape)
+                        .background(RessoSecondary.copy(alpha = 0.15f)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Speed,
+                        contentDescription = null,
+                        tint = RessoSecondary,
+                        modifier = Modifier.size(20.dp)
+                    )
+                }
+                Spacer(modifier = Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = "Lossless HD Audio Engine",
+                        fontWeight = FontWeight.Bold,
+                        color = Color.White,
+                        fontSize = 14.sp
+                    )
+                    Text(
+                        text = "Auto 320 kbps High Fidelity • Zero Latency",
+                        color = RessoSecondary,
+                        fontSize = 11.sp
+                    )
+                }
+            }
+        }
+
         Spacer(modifier = Modifier.height(20.dp))
 
         // Navigation Quick Links
@@ -632,23 +612,32 @@ fun SidebarDrawerContent(
 
         SidebarNavItem(
             icon = Icons.Default.MusicVideo,
-            title = "For You Player",
+            title = "For You (Vertical Player)",
             isSelected = currentTab == "foryou",
-            onClick = { onNavigateToTab("foryou") }
+            onClick = {
+                onNavigateToTab("foryou")
+                onCloseDrawer()
+            }
         )
 
         SidebarNavItem(
             icon = Icons.Default.Explore,
             title = "Search & Discover",
             isSelected = currentTab == "explore",
-            onClick = { onNavigateToTab("explore") }
+            onClick = {
+                onNavigateToTab("explore")
+                onCloseDrawer()
+            }
         )
 
         SidebarNavItem(
             icon = Icons.Default.LibraryMusic,
             title = "My Library & Liked",
             isSelected = currentTab == "library",
-            onClick = { onNavigateToTab("library") }
+            onClick = {
+                onNavigateToTab("library")
+                onCloseDrawer()
+            }
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -661,20 +650,30 @@ fun SidebarDrawerContent(
             border = androidx.compose.foundation.BorderStroke(1.dp, RessoPrimary.copy(alpha = 0.25f))
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Security,
+                        contentDescription = null,
+                        tint = RessoPrimary,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Resso ByteDance Edition",
+                        color = RessoPrimary,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
                 Text(
-                    text = "App Package",
-                    color = RessoPrimary,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                Text(
-                    text = "com.resso.craka",
+                    text = "Package: com.resso.craka • v1.0",
                     color = Color.White,
-                    fontSize = 12.sp,
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Medium
                 )
                 Text(
-                    text = "Resso ByteDance Edition • v1.0",
+                    text = "Lag-Free • Real-Time Lyrics • Background Playback",
                     color = RessoTextSecondary,
                     fontSize = 10.sp
                 )
