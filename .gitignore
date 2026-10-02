@@ -16,3 +16,30 @@
 local.properties
 .env
 debug.keystore
+
+# Build outputs (APK, dist, etc.)
+output_apk/
+dist/
+app/build/
+
+# Replit-specific files
+.replit
+replit.md
+.agents/
+
+# AI Studio metadata
+metadata.json
+
+# Node modules
+node_modules/
+package-lock.json
+yarn.lock
+
+# IDE
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+Thumbs.db
