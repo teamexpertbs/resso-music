@@ -163,6 +163,66 @@ class MusicRepository(context: Context) {
         private const val WEEK_MS = 7 * 24 * 60 * 60 * 1000L
     }
 
+    suspend fun scanDeviceAudio() = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        try {
+            val projection = arrayOf(
+                android.provider.MediaStore.Audio.Media._ID,
+                android.provider.MediaStore.Audio.Media.TITLE,
+                android.provider.MediaStore.Audio.Media.ARTIST,
+                android.provider.MediaStore.Audio.Media.ALBUM,
+                android.provider.MediaStore.Audio.Media.DURATION,
+                android.provider.MediaStore.Audio.Media.DATA
+            )
+            val selection = "${android.provider.MediaStore.Audio.Media.IS_MUSIC} != 0"
+            val cursor = appContext.contentResolver.query(
+                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
+                projection,
+                selection,
+                null,
+                "${android.provider.MediaStore.Audio.Media.DATE_ADDED} DESC"
+            )
+            val localSongs = mutableListOf<SongEntity>()
+            cursor?.use { c ->
+                val idCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media._ID)
+                val titleCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE)
+                val artistCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.ARTIST)
+                val albumCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.ALBUM)
+                val durCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.DURATION)
+                val dataCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.DATA)
+                while (c.moveToNext()) {
+                    if (idCol < 0 || titleCol < 0 || dataCol < 0) continue
+                    val mediaId = c.getLong(idCol)
+                    val title = c.getString(titleCol) ?: "Unknown"
+                    val artist = if (artistCol >= 0) c.getString(artistCol) ?: "Unknown Artist" else "Unknown Artist"
+                    val album = if (albumCol >= 0) c.getString(albumCol) ?: "Local" else "Local"
+                    val durationMs = if (durCol >= 0) c.getLong(durCol) else 0L
+                    val data = c.getString(dataCol) ?: ""
+                    if (durationMs > 10000L && data.isNotBlank()) {
+                        localSongs.add(
+                            SongEntity(
+                                id = "local_$mediaId",
+                                title = title,
+                                artist = artist,
+                                album = album,
+                                durationMs = durationMs,
+                                audioUrl = data,
+                                albumArtUrl = "",
+                                genre = "Local Device",
+                                mood = "Offline",
+                                isLiked = false
+                            )
+                        )
+                    }
+                }
+            }
+            if (localSongs.isNotEmpty()) {
+                songDao.insertSongs(localSongs)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("MusicRepository", "scanDeviceAudio: ${e.message}")
+        }
+    }
+
     private suspend fun updateDefaultStreamsIfEmpty() {
         val streamMap = mapOf(
             "saavn_payal" to "https://aac.saavncdn.com/173/ad5df053bfb2a4755cbb6c74e6183406_320.mp4",

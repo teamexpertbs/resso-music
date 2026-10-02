@@ -121,8 +121,10 @@ fun ExploreScreen(
 
     LaunchedEffect(searchKeyword) {
         if (searchKeyword.isNotBlank()) {
-            delay(500)
+            delay(280) // Fast 280ms typing debounce for snappy real-time results
             viewModel.searchMusic(searchKeyword)
+        } else {
+            viewModel.searchMusic("") // Instant clear
         }
     }
 

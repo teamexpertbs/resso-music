@@ -423,6 +423,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    fun scanDeviceAudio() {
+        viewModelScope.launch {
+            repository.scanDeviceAudio()
+        }
+    }
+
     fun searchMusic(query: String) {
         searchJob?.cancel()
         val trimmed = query.trim()

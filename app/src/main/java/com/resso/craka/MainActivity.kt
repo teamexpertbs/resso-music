@@ -113,10 +113,16 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 val context = LocalContext.current
 
-                // Runtime permissions (Camera for flashlight torch sync, Notifications for background play)
+                // Runtime permissions (Notifications, Local Audio/Storage, Record Audio/EQ, Camera/Flash)
                 val permissionsLauncher = rememberLauncherForActivityResult(
                     contract = ActivityResultContracts.RequestMultiplePermissions()
-                ) { _ -> }
+                ) { grants ->
+                    val grantedAudio = grants[Manifest.permission.READ_MEDIA_AUDIO] == true ||
+                        grants[Manifest.permission.READ_EXTERNAL_STORAGE] == true
+                    if (grantedAudio) {
+                        musicViewModel.scanDeviceAudio()
+                    }
+                }
 
                 LaunchedEffect(Unit) {
                     val permissions = mutableListOf<String>()
@@ -124,6 +130,16 @@ class MainActivity : ComponentActivity() {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                             permissions.add(Manifest.permission.POST_NOTIFICATIONS)
                         }
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
+                        }
+                    } else {
+                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
+                            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        }
+                    }
+                    if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                        permissions.add(Manifest.permission.RECORD_AUDIO)
                     }
                     if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) != PackageManager.PERMISSION_GRANTED) {
                         permissions.add(Manifest.permission.CAMERA)
@@ -131,6 +147,7 @@ class MainActivity : ComponentActivity() {
                     if (permissions.isNotEmpty()) {
                         permissionsLauncher.launch(permissions.toTypedArray())
                     }
+                    musicViewModel.scanDeviceAudio()
                 }
 
                 var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library"

@@ -149,6 +149,9 @@ class PlaybackService : Service() {
                     "User-Agent",
                     "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 Chrome/120.0.0.0 Mobile Safari/537.36"
                 )
+                if (url.contains("saavncdn.com") || url.contains("jiosaavn.com")) {
+                    setRequestProperty("Referer", "https://www.jiosaavn.com/")
+                }
                 if (url.contains("ytimg") || url.contains("ggpht")) {
                     setRequestProperty("Referer", "https://www.youtube.com/")
                 }
