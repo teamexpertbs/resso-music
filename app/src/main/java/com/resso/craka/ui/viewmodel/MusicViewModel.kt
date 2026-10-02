@@ -1294,7 +1294,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _networkStatusMessage.value = "🎛️ Equalizer profile: $preset applied"
     }
 
-    private fun applyEqualizer(); applyVolumeBooster() {
+    private fun applyEqualizer() {
         val preset = _equalizerPreset.value
         if (preset == "Off") {
             appEqualizer.release()

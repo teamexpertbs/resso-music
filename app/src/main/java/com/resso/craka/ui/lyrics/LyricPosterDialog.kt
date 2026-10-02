@@ -12,9 +12,7 @@ import android.graphics.Typeface
 import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
-import android.widget.Toast
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +25,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
@@ -64,7 +61,6 @@ import androidx.core.content.FileProvider
 import com.resso.craka.data.model.SongEntity
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoPrimary
-import com.resso.craka.ui.theme.RessoSecondary
 import com.resso.craka.ui.theme.RessoSurface
 import com.resso.craka.ui.theme.RessoTextSecondary
 import com.resso.craka.ui.viewmodel.MusicViewModel
@@ -78,6 +74,7 @@ fun LyricPosterDialog(
 ) {
     val currentSong by viewModel.currentSong.collectAsState()
     val selectedLyric by viewModel.selectedPosterLyric.collectAsState()
+    val lyricText = selectedLyric?.text ?: ""
     val context = LocalContext.current
 
     var selectedTheme by remember { mutableStateOf("Neon Cyber") }
@@ -143,8 +140,9 @@ fun LyricPosterDialog(
                         )
 
                         // Lyric Text
+                        val quoteDisplay = if (lyricText.isNotBlank()) "\"$lyricText\"" else "\"Music is life itself.\""
                         Text(
-                            text = if (selectedLyric.isNotBlank()) ""$selectedLyric"" else ""Music is life itself."",
+                            text = quoteDisplay,
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold,
                             fontStyle = FontStyle.Italic,
@@ -216,7 +214,7 @@ fun LyricPosterDialog(
                         shareLyricPoster(
                             context = context,
                             song = currentSong,
-                            lyric = selectedLyric,
+                            lyric = lyricText,
                             themeName = selectedTheme
                         )
                         onDismiss()
@@ -342,16 +340,11 @@ private fun shareLyricPoster(
         }
 
         val fileUri = FileProvider.getUriForFile(context, "${context.packageName}.fileprovider", posterFile)
+        val shareCaption = "🎵 \"$displayLyric\"\n— $trackTitle by $trackArtist\n\nShared via Resso Music 🎧"
         val shareIntent = Intent(Intent.ACTION_SEND).apply {
             type = "image/png"
             putExtra(Intent.EXTRA_STREAM, fileUri)
-            putExtra(
-                Intent.EXTRA_TEXT,
-                "🎵 "$displayLyric"
-— $trackTitle by $trackArtist
-
-Shared via Resso Music 🎧"
-            )
+            putExtra(Intent.EXTRA_TEXT, shareCaption)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -360,10 +353,7 @@ Shared via Resso Music 🎧"
         context.startActivity(chooser)
     } catch (e: Exception) {
         // Fallback to text intent if image generation fails
-        val fallbackText = "🎵 "$lyric"
-— ${song?.title ?: "Song"} by ${song?.artist ?: ""}
-
-Shared via Resso Music 🎧"
+        val fallbackText = "🎵 \"$lyric\"\n— ${song?.title ?: "Song"} by ${song?.artist ?: ""}\n\nShared via Resso Music 🎧"
         val textIntent = Intent(Intent.ACTION_SEND).apply {
             type = "text/plain"
             putExtra(Intent.EXTRA_TEXT, fallbackText)

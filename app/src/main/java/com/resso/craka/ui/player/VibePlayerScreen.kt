@@ -641,6 +641,8 @@ private fun PlayerTopActionButton(
 
 @Composable
 private fun PlayerToolRow(viewModel: MusicViewModel) {
+    val currentSong by viewModel.currentSong.collectAsState()
+    val currentVibeUri by viewModel.currentVibeUri.collectAsState()
     val sleep by viewModel.sleepMinutesLeft.collectAsState()
     val offset by viewModel.lyricOffsetMs.collectAsState()
     val is8D by viewModel.is8DAudioEnabled.collectAsState()
