@@ -461,7 +461,7 @@ fun SidebarDrawerContent(
 
                     Column {
                         Text(
-                            text = "Volume Booster (+150%)",
+                            text = "Volume Booster (+6 dB)",
                             fontWeight = FontWeight.Bold,
                             color = Color.White,
                             fontSize = 14.sp
@@ -480,7 +480,7 @@ fun SidebarDrawerContent(
                         viewModel.toggleVolumeBooster()
                         Toast.makeText(
                             context,
-                            if (!isVolumeBooster) "Volume Booster: +150% Active" else "Volume Booster: Normal",
+                            if (!isVolumeBooster) "Volume Booster: +6 dB Active" else "Volume Booster: Normal",
                             Toast.LENGTH_SHORT
                         ).show()
                     },

@@ -21,6 +21,9 @@ class FlashSyncManager(private val context: Context) {
     private var rhythmJob: Job? = null
     private val scope = CoroutineScope(Dispatchers.Default)
 
+    // Latency compensation offset (AudioTrack buffer decode-to-speaker delay, default 160ms)
+    var latencyOffsetMs: Long = 160L
+
     init {
         findCameraWithFlash()
     }
@@ -36,14 +39,18 @@ class FlashSyncManager(private val context: Context) {
                     if (facing == CameraCharacteristics.LENS_FACING_BACK) return
                 }
             }
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             cameraId = null
         }
     }
 
-    fun pulseOnce() {
+    fun pulseOnce(delayMs: Long = latencyOffsetMs) {
         if (!isBeatSyncRunning) return
         scope.launch {
+            if (delayMs > 0) {
+                delay(delayMs)
+            }
+            if (!isBeatSyncRunning) return@launch
             setFlash(true)
             delay(50)
             setFlash(false)
@@ -53,14 +60,6 @@ class FlashSyncManager(private val context: Context) {
     fun startDirectSync() {
         stopSync()
         isBeatSyncRunning = true
-    }
-
-    fun startSync(audioSessionId: Int = 0) {
-        if (audioSessionId > 0) {
-            startDirectSync()
-        } else {
-            startFallbackRhythm()
-        }
     }
 
     fun startFallbackRhythm() {
@@ -95,9 +94,9 @@ class FlashSyncManager(private val context: Context) {
         try {
             cameraManager?.setTorchMode(cid, on)
             isTorchOn = on
-        } catch (e: CameraAccessException) {
+        } catch (_: CameraAccessException) {
             isTorchOn = false
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             isTorchOn = false
         }
     }

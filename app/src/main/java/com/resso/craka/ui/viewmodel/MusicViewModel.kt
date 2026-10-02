@@ -62,7 +62,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 enableAudioTrackPlaybackParams: Boolean
             ): AudioSink? {
                 return DefaultAudioSink.Builder(context)
-                    .setAudioProcessors(arrayOf(eightDAudioProcessor, beatDetectionAudioProcessor))
+                    .setAudioProcessors(arrayOf(beatDetectionAudioProcessor, eightDAudioProcessor))
                     .build()
             }
         }
@@ -238,6 +238,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val isCrossfadeEnabled: StateFlow<Boolean> = _isCrossfadeEnabled.asStateFlow()
 
     private var isCrossfading = false
+    private var crossfadeTriggeredForCurrentSong = false
 
     private val appEqualizer = AppEqualizer()
     private var sleepJob: Job? = null
@@ -643,6 +644,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     // Update active lyric index
                     val currentLyrics = _lyrics.value
                     if (currentLyrics.isNotEmpty()) updateLyricIndex(pos)
+
+                    // Seamless Crossfade & DJ Transition in last 3.5s for normal ExoPlayer songs
+                    if (_isCrossfadeEnabled.value && dur > 15_000L && !isCrossfading && !crossfadeTriggeredForCurrentSong) {
+                        val remainingMs = dur - pos
+                        if (remainingMs in 500L..3500L) {
+                            crossfadeTriggeredForCurrentSong = true
+                            triggerCrossfade()
+                        }
+                    }
                 }
                 delay(250)
             }
@@ -663,6 +673,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
         _currentSong.value = song
         _currentSongIndex.value = index
+        crossfadeTriggeredForCurrentSong = false
 
         // Anti-repeat session memory (never repeats in current session)
         synchronized(playedHistoryIds) {
@@ -1108,7 +1119,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         player.volume = 1.0f
         applyVolumeBooster()
         streamPlayerManager.setBoost(newState)
-        _networkStatusMessage.value = if (newState) "🔊 Volume Booster: +150% Active (Safe +6dB DSP Boost) ⚡" else "Volume Booster: Normal"
+        _networkStatusMessage.value = if (newState) "Volume Booster: +6 dB Active (Safe Boost)" else "Volume Booster: Normal"
     }
 
     // Vibe Creator: Save custom video vibe associated with current song
