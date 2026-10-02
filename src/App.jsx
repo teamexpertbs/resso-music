@@ -1907,7 +1907,7 @@ export default function App() {
               </div>
             ) : (
               <div className="space-y-2">
-                <div className="text-[11px] font-bold text-white/70 mb-1">ALL TRACKS IN QUEUE</div>
+                <div className="text-[11px] font-bold text-white/70 mb-1">ALL TRACKS</div>
                 {songs.map((s, idx) => (
                   <div
                     key={s.id}

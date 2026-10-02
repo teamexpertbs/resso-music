@@ -641,7 +641,6 @@ private fun PlayerTopActionButton(
 
 @Composable
 private fun PlayerToolRow(viewModel: MusicViewModel) {
-    val queue by viewModel.queue.collectAsState()
     val sleep by viewModel.sleepMinutesLeft.collectAsState()
     val offset by viewModel.lyricOffsetMs.collectAsState()
     val is8D by viewModel.is8DAudioEnabled.collectAsState()
@@ -653,7 +652,6 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
             .padding(top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        ToolChip("Queue") { sheet = "queue" }
         ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { sheet = "sleep" }
         ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D") { viewModel.toggle8DAudio() }
         ToolChip("EQ") { sheet = "eq" }
@@ -661,28 +659,6 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
         ToolChip("Sync") { sheet = "offset" }
     }
     when (sheet) {
-        "queue" -> AlertDialog(
-            onDismissRequest = { sheet = null },
-            containerColor = Color(0xFF161616),
-            title = { Text("Up next", color = Color.White) },
-            text = {
-                if (queue.isEmpty()) {
-                    Text("Queue is empty", color = RessoTextSecondary)
-                } else {
-                    Column {
-                        queue.forEachIndexed { index, song ->
-                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                Text(song.title, color = Color.White, maxLines = 1, modifier = Modifier.weight(1f))
-                                TextButton(onClick = { viewModel.moveInQueue(index, -1) }) { Text("Up") }
-                                TextButton(onClick = { viewModel.moveInQueue(index, 1) }) { Text("Down") }
-                                TextButton(onClick = { viewModel.removeFromQueue(song.id) }) { Text("Remove") }
-                            }
-                        }
-                    }
-                }
-            },
-            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
-        )
         "sleep" -> AlertDialog(
             onDismissRequest = { sheet = null },
             containerColor = Color(0xFF161616),
