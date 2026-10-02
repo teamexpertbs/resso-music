@@ -13,6 +13,11 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import android.media.audiofx.LoudnessEnhancer
+import androidx.media3.exoplayer.DefaultRenderersFactory
+import androidx.media3.exoplayer.audio.DefaultAudioSink
+import androidx.media3.exoplayer.audio.AudioSink
+import com.resso.craka.player.Spatial8DAudioProcessor
 import androidx.media3.exoplayer.ExoPlayer
 import com.resso.craka.service.PlaybackService
 import com.resso.craka.RessoApplication
@@ -41,18 +46,34 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as RessoApplication).repository
     val flashSyncManager = FlashSyncManager(application)
     val streamPlayerManager = StreamPlayerManager(application)
+    val eightDAudioProcessor = Spatial8DAudioProcessor()
+    private var loudnessEnhancer: LoudnessEnhancer? = null
+    private var loudnessSessionId: Int = C.AUDIO_SESSION_ID_UNSET
 
-    private val player: ExoPlayer = ExoPlayer.Builder(application)
-        .setAudioAttributes(
-            AudioAttributes.Builder()
-                .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
-                .setUsage(C.USAGE_MEDIA)
-                .build(),
-            true
-        )
-        .setHandleAudioBecomingNoisy(true)
-        .setWakeMode(C.WAKE_MODE_NETWORK)
-        .build()
+    private val player: ExoPlayer = run {
+        val renderersFactory = object : DefaultRenderersFactory(application) {
+            override fun buildAudioSink(
+                context: Context,
+                enableFloatOutput: Boolean,
+                enableAudioTrackPlaybackParams: Boolean
+            ): AudioSink? {
+                return DefaultAudioSink.Builder(context)
+                    .setAudioProcessors(arrayOf(eightDAudioProcessor))
+                    .build()
+            }
+        }
+        ExoPlayer.Builder(application, renderersFactory)
+            .setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
+                    .setUsage(C.USAGE_MEDIA)
+                    .build(),
+                true
+            )
+            .setHandleAudioBecomingNoisy(true)
+            .setWakeMode(C.WAKE_MODE_NETWORK)
+            .build()
+    }
 
     val allSongs: StateFlow<List<SongEntity>> = repository.getAllSongs()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -308,7 +329,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         publishPlayback(streamPlaying)
                     }
                     if (streamPlaying && _isFlashSyncEnabled.value) {
-                        flashSyncManager.startSync(128)
+                        val sess = player.audioSessionId; flashSyncManager.startSync(if (sess != C.AUDIO_SESSION_ID_UNSET && sess > 0) sess else 0)
                     } else if (!streamPlaying && !player.isPlaying) {
                         flashSyncManager.stopSync()
                     }
@@ -569,7 +590,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (song != null && !song.id.startsWith("yt_")) {
                     _isPlaying.value = playing
                     if (playing && _isFlashSyncEnabled.value) {
-                        flashSyncManager.startSync(128)
+                        val sess = player.audioSessionId; flashSyncManager.startSync(if (sess != C.AUDIO_SESSION_ID_UNSET && sess > 0) sess else 0)
                     } else if (!playing && !streamPlayerManager.isPlaying.value) {
                         flashSyncManager.stopSync()
                     }
@@ -581,7 +602,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (song != null && !song.id.startsWith("yt_")) {
                     if (state == Player.STATE_READY) {
                         _durationMs.value = player.duration.coerceAtLeast(1L)
-                        applyEqualizer()
+                        applyEqualizer(); applyVolumeBooster()
                     } else if (state == Player.STATE_ENDED) {
                         handleSongEnded()
                     }
@@ -690,7 +711,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (needsRealLyrics(song.lyricsLrc)) {
             fetchAndApplyLyrics(song)
         }
-        applyEqualizer()
+        applyEqualizer(); applyVolumeBooster()
         publishPlayback(autoPlay)
 
         // Proactively replenish live radio buffer ahead of time
@@ -1019,9 +1040,32 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val newState = !_isFlashSyncEnabled.value
         _isFlashSyncEnabled.value = newState
         if (newState && _isPlaying.value) {
-            flashSyncManager.startSync(128)
+            val sess = player.audioSessionId; flashSyncManager.startSync(if (sess != C.AUDIO_SESSION_ID_UNSET && sess > 0) sess else 0)
         } else {
             flashSyncManager.stopSync()
+        }
+    }
+
+    private fun applyVolumeBooster() {
+        val enabled = _isVolumeBoosterEnabled.value
+        val sessionId = player.audioSessionId
+        if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId <= 0) return
+        try {
+            if (loudnessEnhancer == null || loudnessSessionId != sessionId) {
+                try { loudnessEnhancer?.release() } catch (_: Exception) {}
+                loudnessEnhancer = LoudnessEnhancer(sessionId)
+                loudnessSessionId = sessionId
+            }
+            loudnessEnhancer?.apply {
+                if (enabled) {
+                    setTargetGain(1200) // +12 dB hardware DSP boost (+150% to +200% volume)
+                    this.enabled = true
+                } else {
+                    this.enabled = false
+                }
+            }
+        } catch (e: Exception) {
+            Log.w("MusicViewModel", "LoudnessEnhancer error: ${e.message}")
         }
     }
 
@@ -1029,8 +1073,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleVolumeBooster() {
         val newState = !_isVolumeBoosterEnabled.value
         _isVolumeBoosterEnabled.value = newState
-        player.volume = if (newState) 1.5f else 1.0f
+        player.volume = 1.0f
+        applyVolumeBooster()
         streamPlayerManager.setBoost(newState)
+        _networkStatusMessage.value = if (newState) "🔊 Volume Booster: +150% Active (Hardware DSP Boost) ⚡" else "Volume Booster: Normal"
     }
 
     // Vibe Creator: Save custom video vibe associated with current song
@@ -1168,32 +1214,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun startSleepTimer(minutes: Int) {
         sleepJob?.cancel()
         _sleepMinutesLeft.value = minutes
-        _networkStatusMessage.value = "🌙 Sleep Timer set for $minutes mins (Smooth 30s volume fade-out)"
+        _networkStatusMessage.value = "🌙 Sleep Timer set for $minutes mins (Smooth volume fade-out)"
         sleepJob = viewModelScope.launch {
-            var left = minutes
-            while (left > 1) {
-                kotlinx.coroutines.delay(60_000)
-                left -= 1
-                _sleepMinutesLeft.value = left
-            }
-            if (left == 1) {
-                kotlinx.coroutines.delay(30_000)
-                _sleepMinutesLeft.value = 0
-                // 30 seconds smooth volume fade-out
-                for (v in 30 downTo 0) {
-                    val volPercent = (v * 100) / 30
-                    streamPlayerManager.setVolume(volPercent)
-                    kotlinx.coroutines.delay(1_000)
+            val totalSeconds = minutes * 60
+            for (sec in totalSeconds downTo 0) {
+                _sleepMinutesLeft.value = (sec + 59) / 60
+                // In last 20 seconds, fade out volume smoothly for ExoPlayer AND WebView
+                if (sec in 1..20) {
+                    val factor = sec / 20.0f
+                    player.volume = factor
+                    streamPlayerManager.setVolume((factor * 100).toInt())
                 }
+                kotlinx.coroutines.delay(1_000)
             }
             pausePlayback()
+            player.volume = 1.0f
             streamPlayerManager.setVolume(100)
             _sleepMinutesLeft.value = 0
+            _networkStatusMessage.value = "🌙 Sleep Timer finished - Goodnight!"
         }
     }
 
     fun cancelSleepTimer() {
         sleepJob?.cancel()
+        player.volume = 1.0f
         streamPlayerManager.setVolume(100)
         _sleepMinutesLeft.value = 0
         _networkStatusMessage.value = "Sleep Timer cancelled"
@@ -1202,10 +1246,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggle8DAudio() {
         val next = !_is8DAudioEnabled.value
         _is8DAudioEnabled.value = next
-        appEqualizer.set8DAudio(next)
+        eightDAudioProcessor.is8DEnabled = next
+        val session = player.audioSessionId
+        appEqualizer.set8DAudio(next, if (session != C.AUDIO_SESSION_ID_UNSET && session > 0) session else 0)
         streamPlayerManager.set8DAudio(next)
         if (next) {
-            _networkStatusMessage.value = "🎧 8D Spatial Audio: ON (3D binaural surround sound)"
+            _networkStatusMessage.value = "🎧 8D Spatial Audio: ON (360° Binaural Orbit + Reverb)"
         } else {
             _networkStatusMessage.value = "8D Audio: Normal"
         }
@@ -1219,16 +1265,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun triggerCrossfade() {
         isCrossfading = true
         viewModelScope.launch {
+            // Smoothly fade out ending song on both ExoPlayer and stream
             for (step in 3 downTo 1) {
-                streamPlayerManager.setVolume(step * 30)
+                val vol = step / 4f
+                player.volume = vol
+                streamPlayerManager.setVolume((vol * 100).toInt())
                 kotlinx.coroutines.delay(700)
             }
             playNextSong()
-            streamPlayerManager.setVolume(30)
-            kotlinx.coroutines.delay(400)
-            streamPlayerManager.setVolume(70)
-            kotlinx.coroutines.delay(500)
-            streamPlayerManager.setVolume(100)
+            // Smoothly fade in beginning of next song
+            val fadeSteps = listOf(0.3f, 0.6f, 0.85f, 1.0f)
+            for (vol in fadeSteps) {
+                player.volume = vol
+                streamPlayerManager.setVolume((vol * 100).toInt())
+                kotlinx.coroutines.delay(400)
+            }
             isCrossfading = false
         }
     }
@@ -1239,12 +1290,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             appEqualizer.release()
             return
         }
-        appEqualizer.attach(0)
-        appEqualizer.apply(preset)
+        applyEqualizer(); applyVolumeBooster()
         _networkStatusMessage.value = "🎛️ Equalizer profile: $preset applied"
     }
 
-    private fun applyEqualizer() {
+    private fun applyEqualizer(); applyVolumeBooster() {
         val preset = _equalizerPreset.value
         if (preset == "Off") {
             appEqualizer.release()
@@ -1256,9 +1306,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val session = player.audioSessionId
-        if (session == C.AUDIO_SESSION_ID_UNSET) return
+        if (session == C.AUDIO_SESSION_ID_UNSET || session <= 0) return
         appEqualizer.attach(session)
         appEqualizer.apply(preset)
+        applyVolumeBooster()
     }
 
     private fun mediaUri(audioUrl: String): Uri {

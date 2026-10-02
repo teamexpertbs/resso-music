@@ -11,7 +11,8 @@ class AppEqualizer {
     private var virtualizer: Virtualizer? = null
     private var attachedSession: Int = Int.MIN_VALUE
 
-    fun attach(sessionId: Int = 0) {
+    fun attach(sessionId: Int) {
+        if (sessionId <= 0) return
         if (equalizer != null && sessionId == attachedSession) return
         release()
         try {
@@ -40,10 +41,10 @@ class AppEqualizer {
         attachedSession = sessionId
     }
 
-    fun set8DAudio(enabled: Boolean) {
+    fun set8DAudio(enabled: Boolean, sessionId: Int = 0) {
         try {
-            if (virtualizer == null && enabled) {
-                attach(0)
+            if (sessionId > 0 && (virtualizer == null || attachedSession != sessionId)) {
+                attach(sessionId)
             }
             virtualizer?.enabled = enabled
             bassBoost?.enabled = enabled

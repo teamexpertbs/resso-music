@@ -654,6 +654,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
     ) {
         ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { sheet = "sleep" }
         ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D") { viewModel.toggle8DAudio() }
+        ToolChip(if (!currentVibeUri.isNullOrBlank()) "✨ Vibe ON" else "✨ Vibe") { sheet = "vibe" }
         ToolChip("EQ") { sheet = "eq" }
         ToolChip("Save") { viewModel.saveCurrentOffline() }
         ToolChip("Sync") { sheet = "offset" }
@@ -715,6 +716,95 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
             },
             confirmButton = { TextButton(onClick = { sheet = null }) { Text("Done") } }
         )
+        "vibe" -> {
+            val videoPicker = rememberLauncherForActivityResult(
+                ActivityResultContracts.GetContent()
+            ) { uri ->
+                if (uri != null && currentSong != null) {
+                    viewModel.saveCustomSongVibe(
+                        songId = currentSong!!.id,
+                        title = "${currentSong!!.title} Vibe",
+                        videoUri = uri.toString(),
+                        startTrimMs = 0L,
+                        endTrimMs = 30000L,
+                        filterType = "Normal"
+                    )
+                    sheet = null
+                }
+            }
+
+            AlertDialog(
+                onDismissRequest = { sheet = null },
+                containerColor = Color(0xFF161616),
+                title = { Text("Song Vibe & Background", color = Color.White, fontWeight = FontWeight.Bold) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            text = "Add a dynamic video background for this song:",
+                            fontSize = 13.sp,
+                            color = Color.White.copy(alpha = 0.7f)
+                        )
+                        androidx.compose.material3.Button(
+                            onClick = { videoPicker.launch("video/*") },
+                            colors = androidx.compose.material3.ButtonDefaults.buttonColors(containerColor = RessoPrimary),
+                            shape = RoundedCornerShape(12.dp),
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Icon(Icons.Default.MusicVideo, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(8.dp))
+                            Text("Choose Video from Gallery", fontWeight = FontWeight.Bold)
+                        }
+
+                        Text(
+                            text = "Preset Motion Vibes:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color.White.copy(alpha = 0.5f),
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+
+                        val presets = listOf(
+                            "🌌 Cyber Neon Wave" to "https://assets.mixkit.co/videos/preview/mixkit-tunnel-of-futuristic-neon-lights-41584-large.mp4",
+                            "🌅 Sunset Horizon" to "https://assets.mixkit.co/videos/preview/mixkit-clouds-and-blue-sky-2408-large.mp4",
+                            "🌧️ Lofi Rain Drops" to "https://assets.mixkit.co/videos/preview/mixkit-rain-drops-falling-on-a-window-1520-large.mp4"
+                        )
+
+                        presets.forEach { (name, url) ->
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(8.dp))
+                                    .background(Color.White.copy(alpha = 0.08f))
+                                    .clickable {
+                                        currentSong?.let { s ->
+                                            viewModel.saveCustomSongVibe(s.id, name, url, 0L, 30000L, "Normal")
+                                        }
+                                        sheet = null
+                                    }
+                                    .padding(horizontal = 12.dp, vertical = 10.dp)
+                            ) {
+                                Text(name, color = Color.White, fontSize = 13.sp)
+                            }
+                        }
+
+                        if (!currentVibeUri.isNullOrBlank()) {
+                            TextButton(
+                                onClick = {
+                                    currentSong?.let { s ->
+                                        viewModel.saveCustomSongVibe(s.id, "", "", 0L, 0L, "")
+                                    }
+                                    sheet = null
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("Remove Current Vibe", color = Color(0xFFFF5252))
+                            }
+                        }
+                    }
+                },
+                confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
+            )
+        }
     }
 }
 
