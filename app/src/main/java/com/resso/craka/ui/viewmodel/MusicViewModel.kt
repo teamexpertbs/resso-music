@@ -376,6 +376,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (cached.isNotEmpty()) {
             _trendingSongs.value = cached
             if (playbackQueue.value.isEmpty()) playbackQueue.value = cached
+            restoreLastPlaybackOrInitial(cached)
         }
         viewModelScope.launch {
             try {
@@ -385,8 +386,38 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (playbackQueue.value.isEmpty() || playbackQueue.value.map { it.id } == cached.map { it.id }) {
                     playbackQueue.value = trending
                 }
+                restoreLastPlaybackOrInitial(trending)
             } catch (e: Exception) {
                 Log.w("MusicViewModel", "Error loading trending: ${e.message}")
+            }
+        }
+    }
+
+    private fun restoreLastPlaybackOrInitial(trendingList: List<SongEntity>) {
+        if (_currentSong.value != null) return
+        viewModelScope.launch {
+            val lastId = playerPrefs.getString("last_played_song_id", null)
+            val lastPos = playerPrefs.getLong("last_position_ms", 0L)
+
+            var songToSelect: SongEntity? = null
+            if (!lastId.isNullOrBlank()) {
+                songToSelect = repository.getSongById(lastId)
+            }
+            if (songToSelect == null && trendingList.isNotEmpty()) {
+                songToSelect = trendingList.firstOrNull()
+            }
+            if (songToSelect == null && allSongs.value.isNotEmpty()) {
+                songToSelect = allSongs.value.firstOrNull()
+            }
+
+            songToSelect?.let { song ->
+                if (_currentSong.value == null) {
+                    selectSong(song, 0, autoPlay = false)
+                    if (lastPos > 0L) {
+                        delay(300)
+                        seekTo(lastPos)
+                    }
+                }
             }
         }
     }
@@ -643,6 +674,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             player.pause()
         }
         _isPlaying.value = false
+        playerPrefs.edit()
+            .putString("last_played_song_id", song.id)
+            .putLong("last_position_ms", _currentPositionMs.value)
+            .apply()
         publishPlayback(false)
     }
 
@@ -766,6 +801,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         } else {
             player.seekTo(positionMs)
         }
+        playerPrefs.edit().putLong("last_position_ms", positionMs).apply()
     }
 
     fun toggleShuffle() {

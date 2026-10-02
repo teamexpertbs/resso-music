@@ -8,18 +8,117 @@ import {
 } from 'lucide-react'
 
 // Authentic Resso songs with full lyrics, audio streams, and vibe themes
+// Authentic 320kbps High Fidelity Resso Catalog (via Live Vercel JioSaavn CDN Stream)
 const INITIAL_SONGS = [
   {
-    id: 's1',
-    title: 'Kesariya',
-    artist: 'Arijit Singh & Pritam',
-    album: 'Brahmāstra (Original Soundtrack)',
-    duration: 268,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music112/v4/9f/13/ca/9f13ca3b-e533-03e0-f19a-f0aaa774581d/196589311191.jpg/600x600bb.jpg',
+    id: 'payal_glory',
+    title: 'Payal',
+    artist: 'Yo Yo Honey Singh, Paradox',
+    album: 'GLORY',
+    duration: 226,
+    audioUrl: 'https://aac.saavncdn.com/173/ad5df053bfb2a4755cbb6c74e6183406_320.mp4',
+    albumArt: 'https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    likesCount: '2.8M',
-    commentsCount: '34.2K',
+    likesCount: '4.8M',
+    commentsCount: '92.4K',
+    bpm: '128 BPM',
+    credits: {
+      composer: 'Yo Yo Honey Singh, Paradox',
+      lyricist: 'Paradox, Yo Yo Honey Singh',
+      producer: 'T-Series',
+      releaseYear: '2024'
+    },
+    lyrics: [
+      { time: 0, text: '♪ Payal - Yo Yo Honey Singh & Paradox ♪' },
+      { time: 5, text: 'Chhan chhan baaje teri payal' },
+      { time: 11, text: 'Kare dil ko yeh ghayal' },
+      { time: 19, text: 'Teri chaal sharaabi, aankhein gulabi' },
+      { time: 27, text: 'Yo Yo Honey Singh with Paradox on the beat!' },
+      { time: 37, text: 'Chhan chhan chhan bole payal' },
+      { time: 47, text: 'Lut gaya dil ho gaya ghayal' },
+      { time: 58, text: '♪ 320kbps Pure Master Audio Bass Drop ♪' },
+      { time: 70, text: 'Lagti kamaal tu, karti bawal tu' },
+      { time: 82, text: 'Poore shehar mein bas tera hi naam hai' }
+    ],
+    genre: 'Desi Hip-Hop',
+    mood: 'Energetic Vibe',
+    isLiked: true,
+    isFollowing: true,
+    isDownloaded: true
+  },
+  {
+    id: 'tauba_tauba',
+    title: 'Tauba Tauba',
+    artist: 'Karan Aujla',
+    album: 'Bad Newz',
+    duration: 207,
+    audioUrl: 'https://aac.saavncdn.com/992/5d44da8bc1d78fb72d18b701d758fd1f_320.mp4',
+    albumArt: 'https://c.saavncdn.com/992/Bad-Newz-Hindi-2024-20250730113701-500x500.jpg',
+    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    likesCount: '3.9M',
+    commentsCount: '62.1K',
+    bpm: '124 BPM',
+    credits: {
+      composer: 'Karan Aujla',
+      lyricist: 'Karan Aujla',
+      producer: 'Junglee Music',
+      releaseYear: '2024'
+    },
+    lyrics: [
+      { time: 0, text: '♪ Tauba Tauba - Karan Aujla ♪' },
+      { time: 6, text: 'Husn tera tauba tauba' },
+      { time: 14, text: 'Nakhre tere tauba tauba' },
+      { time: 22, text: 'Akhiyan de vaar dekho' },
+      { time: 30, text: 'Dil kare beqarar dekho' },
+      { time: 45, text: 'O tauba tauba ae husn tera' }
+    ],
+    genre: 'Punjabi Pop',
+    mood: 'Party Hit',
+    isLiked: true,
+    isFollowing: true,
+    isDownloaded: true
+  },
+  {
+    id: 'aaj_ki_raat',
+    title: 'Aaj Ki Raat',
+    artist: 'Sachin-Jigar, Madhubanti Bagchi, Divya Kumar',
+    album: 'Stree 2',
+    duration: 228,
+    audioUrl: 'https://aac.saavncdn.com/373/36b1b3637cdeedfaa9a9012453948aa6_320.mp4',
+    albumArt: 'https://c.saavncdn.com/373/Stree-2-Hindi-2024-20240828083834-500x500.jpg',
+    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
+    likesCount: '5.1M',
+    commentsCount: '94.3K',
+    bpm: '130 BPM',
+    credits: {
+      composer: 'Sachin-Jigar',
+      lyricist: 'Amitabh Bhattacharya',
+      producer: 'Saregama',
+      releaseYear: '2024'
+    },
+    lyrics: [
+      { time: 0, text: '♪ Aaj Ki Raat - Stree 2 ♪' },
+      { time: 7, text: 'Aaj ki raat maza husn ka aankhon se lijiye' },
+      { time: 16, text: 'Aise na dekhiye zara parda gira lijiye' },
+      { time: 25, text: 'Aayi aayi aayi raat aayi re' }
+    ],
+    genre: 'Bollywood Dance',
+    mood: 'Fiery',
+    isLiked: true,
+    isFollowing: false,
+    isDownloaded: true
+  },
+  {
+    id: 'kesariya_real',
+    title: 'Kesariya',
+    artist: 'Pritam, Arijit Singh, Amitabh Bhattacharya',
+    album: 'Brahmāstra',
+    duration: 268,
+    audioUrl: 'https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4',
+    albumArt: 'https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg',
+    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+    likesCount: '6.8M',
+    commentsCount: '110K',
     bpm: '124 BPM',
     credits: {
       composer: 'Pritam',
@@ -35,14 +134,7 @@ const INITIAL_SONGS = [
       { time: 22, text: 'Kar di hai husn ki khaali tijoriyan' },
       { time: 29, text: 'Kajal ki siyahi se likhi hai tune' },
       { time: 35, text: 'Jaane kitno ki love storiyan' },
-      { time: 41, text: 'Kesariya tera ishq hai piya' },
-      { time: 48, text: 'Rang jaaun jo main haath lagaun' },
-      { time: 54, text: 'Din beete saara teri fikr mein' },
-      { time: 61, text: 'Rain saari teri khair manaun' },
-      { time: 68, text: 'Kesariya tera ishq hai piya' },
-      { time: 76, text: '♪ Acoustic guitar rhythm & violin ♪' },
-      { time: 90, text: 'Patjhad ke mausam mein bhi' },
-      { time: 98, text: 'Rangi chanaar jaisi' }
+      { time: 41, text: 'Kesariya tera ishq hai piya' }
     ],
     genre: 'Bollywood Romance',
     mood: 'Soulful',
@@ -51,276 +143,63 @@ const INITIAL_SONGS = [
     isDownloaded: true
   },
   {
-    id: 's2',
-    title: 'Tum Hi Ho',
-    artist: 'Arijit Singh',
-    album: 'Aashiqui 2 (Original Soundtrack)',
-    duration: 262,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/2d/11/b9/2d11b994-b4fa-19eb-953d-70b472165e95/8903431566911_cover.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    likesCount: '3.4M',
-    commentsCount: '52.1K',
-    bpm: '128 BPM',
-    credits: {
-      composer: 'Mithoon',
-      lyricist: 'Mithoon',
-      producer: 'T-Series',
-      releaseYear: '2013'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Tum Hi Ho - Arijit Singh ♪' },
-      { time: 4, text: 'Hum tere bin ab reh nahi sakte' },
-      { time: 13, text: 'Tere bina kya wajood mera' },
-      { time: 22, text: 'Tujhse juda agar ho jayenge' },
-      { time: 31, text: 'Toh khud se hi ho jayenge juda' },
-      { time: 40, text: 'Kyunki tum hi ho, ab tum hi ho' },
-      { time: 49, text: 'Zindagi ab tum hi ho' },
-      { time: 58, text: 'Chain bhi, mera dard bhi' },
-      { time: 67, text: 'Meri aashiqui ab tum hi ho' },
-      { time: 78, text: '♪ Feel the piano notes & deep bass ♪' },
-      { time: 95, text: 'Tera mera rishta hai kaisa' },
-      { time: 104, text: 'Ek pal door gawaara nahi' }
-    ],
-    genre: 'Bollywood Classic',
-    mood: 'Romantic',
-    isLiked: true,
-    isFollowing: false,
-    isDownloaded: true
-  },
-  {
-    id: 's3',
-    title: 'Pasoori',
-    artist: 'Ali Sethi x Shae Gill',
-    album: 'Coke Studio Season 14',
-    duration: 224,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/f3/f9/06/f3f906c3-79d5-ac9a-5fdd-262048f955f9/cover.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    likesCount: '1.9M',
-    commentsCount: '27.4K',
-    bpm: '115 BPM',
-    credits: {
-      composer: 'Ali Sethi, Fazal Abbas',
-      lyricist: 'Ali Sethi',
-      producer: 'Zulfiqar J. Khan',
-      releaseYear: '2022'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Agg laavan majboori nu ♪' },
-      { time: 5, text: 'Aan jaan di pasoori nu' },
-      { time: 13, text: 'Zahar bane haan teri pee jaavan' },
-      { time: 21, text: 'Marjaavan ya jee jaavan' },
-      { time: 29, text: 'Dil boliyan te aave' },
-      { time: 37, text: 'Aavan te dil lag jaave' },
-      { time: 45, text: 'Chad gaya mainu tera nasha' },
-      { time: 53, text: 'Raawaan ch baithaan main tere' }
-    ],
-    genre: 'Indie Fusion',
-    mood: 'Groovy',
-    isLiked: false,
-    isFollowing: false,
-    isDownloaded: false
-  },
-  {
-    id: 's4',
-    title: 'Apna Bana Le',
-    artist: 'Arijit Singh & Sachin-Jigar',
-    album: 'Bhediya (Original Soundtrack)',
-    duration: 261,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-4.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/2e/0b/c0/2e0bc070-112f-a827-6ad8-6bc64f7caaff/840214460180.png/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
-    likesCount: '2.1M',
-    commentsCount: '29.8K',
-    bpm: '120 BPM',
-    credits: {
-      composer: 'Sachin-Jigar',
-      lyricist: 'Amitabh Bhattacharya',
-      producer: 'Zee Music Company',
-      releaseYear: '2022'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Apna Bana Le - Arijit Singh ♪' },
-      { time: 6, text: 'Tu mera koi na hoke bhi kuch laage' },
-      { time: 14, text: 'Kiya re jo bhi tune kaise kiya re' },
-      { time: 22, text: 'Jiya ko mere baandh aise liya re' },
-      { time: 30, text: 'Samajh ke bhi na samajh main saku' },
-      { time: 38, text: 'Apna bana le piya, apna bana le piya' },
-      { time: 46, text: 'Dil ke nagar mein shehar tu basa le piya' }
-    ],
-    genre: 'Bollywood',
-    mood: 'Heartfelt',
-    isLiked: true,
-    isFollowing: true,
-    isDownloaded: true
-  },
-  {
-    id: 's5',
-    title: 'Chaleya',
-    artist: 'Arijit Singh & Shilpa Rao',
-    album: 'Jawan (Original Soundtrack)',
-    duration: 200,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-5.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/bb/f4/f5/bbf4f511-3c12-c25e-a475-b6d06faa8c13/8902894362047_cover.jpg/600x600bb.jpg',
+    id: 'millionaire_glory',
+    title: 'Millionaire',
+    artist: 'Yo Yo Honey Singh',
+    album: 'GLORY',
+    duration: 199,
+    audioUrl: 'https://aac.saavncdn.com/173/af61d1cf779677cd767692c0a7f3301f_320.mp4',
+    albumArt: 'https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg',
     videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    likesCount: '3.1M',
-    commentsCount: '48.9K',
-    bpm: '130 BPM',
-    credits: {
-      composer: 'Anirudh Ravichander',
-      lyricist: 'Kumaar',
-      producer: 'T-Series',
-      releaseYear: '2023'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Chaleya - Anirudh & Arijit Singh ♪' },
-      { time: 5, text: 'Ishq mein dil bana hai, ishq mein dil fanaa hai' },
-      { time: 13, text: 'Jitna bhi roko dil ko, utna hi dil bada hai' },
-      { time: 21, text: 'Chaleya teri ore chaleya' },
-      { time: 28, text: 'Mera dil ab toh tera ho chukeya' },
-      { time: 36, text: 'Dhadkan ne teri dhun pakad li' },
-      { time: 44, text: 'Ishq tera ab mera hoke chaleya' }
-    ],
-    genre: 'Bollywood Dance',
-    mood: 'Energetic',
-    isLiked: false,
-    isFollowing: false,
-    isDownloaded: false
-  },
-  {
-    id: 's6',
-    title: 'Raataan Lambiyan',
-    artist: 'Jubin Nautiyal & Asees Kaur',
-    album: 'Shershaah (Original Soundtrack)',
-    duration: 230,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music115/v4/c3/df/e7/c3dfe71e-d532-458e-9c1c-32d40f8d9123/886449472222.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
-    likesCount: '2.5M',
-    commentsCount: '38.0K',
-    bpm: '120 BPM',
-    credits: {
-      composer: 'Tanishk Bagchi',
-      lyricist: 'Tanishk Bagchi',
-      producer: 'Sony Music India',
-      releaseYear: '2021'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Raataan Lambiyan - Shershaah ♪' },
-      { time: 6, text: 'Teri meri gallan ho gayi mashhoor' },
-      { time: 14, text: 'Kar na kabhi tu mujhe nazron se door' },
-      { time: 22, text: 'Kithe chaliye tu kithe chaliye' },
-      { time: 30, text: 'Kaatun kaise raataan oh saawre' },
-      { time: 38, text: 'Jiya nahi jaata sun bawre' },
-      { time: 46, text: 'Ke raataan lambiyan lambiyan re' },
-      { time: 54, text: 'Katte tere sangeyan sangeyan re' }
-    ],
-    genre: 'Bollywood Romance',
-    mood: 'Soulful',
-    isLiked: true,
-    isFollowing: false,
-    isDownloaded: true
-  },
-  {
-    id: 's7',
-    title: 'Brown Munde',
-    artist: 'AP Dhillon, Gurinder Gill & Shinda Kahlon',
-    album: 'Brown Munde (Official Release)',
-    duration: 267,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-7.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/26/a3/ac/26a3ac64-69e4-95ec-80ab-1f5a477537d2/859742042973_cover.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
-    likesCount: '4.2M',
-    commentsCount: '71.5K',
-    bpm: '128 BPM',
-    credits: {
-      composer: 'Gminxr',
-      lyricist: 'Shinda Kahlon',
-      producer: 'Run-Up Records',
-      releaseYear: '2020'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Brown Munde - AP Dhillon ♪' },
-      { time: 6, text: 'Desi jehe geet aa trappan jehi beat aa' },
-      { time: 13, text: 'Sir kadd gajde speakeran ch wajde' },
-      { time: 20, text: 'Brown munde, brown munde' },
-      { time: 27, text: 'Dope shope maarde na, game vi vigaarde na' },
-      { time: 34, text: 'Akhaan ch khumaari ae, yaari hi pyari ae' },
-      { time: 41, text: 'Kamm saare end ne, yaaran naal trend ne' },
-      { time: 48, text: 'Sun dhyan naal brown munde!' }
-    ],
-    genre: 'Punjabi Hip-Hop',
-    mood: 'Hype',
-    isLiked: true,
-    isFollowing: true,
-    isDownloaded: false
-  },
-  {
-    id: 's8',
-    title: 'Kahani Suno 2.0',
-    artist: 'Kaifi Khalil',
-    album: 'Kahani Suno (Official)',
-    duration: 174,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-8.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music114/v4/ff/cc/7b/ffcc7bba-4005-f2c4-b1f1-3cc49a5e6283/artwork.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyBlazes.mp4',
-    likesCount: '1.7M',
-    commentsCount: '23.4K',
-    bpm: '110 BPM',
-    credits: {
-      composer: 'Kaifi Khalil',
-      lyricist: 'Kaifi Khalil',
-      producer: 'Kaifi Khalil Music',
-      releaseYear: '2022'
-    },
-    lyrics: [
-      { time: 0, text: '♪ Kahani Suno 2.0 - Kaifi Khalil ♪' },
-      { time: 5, text: 'Kahani suno, zubani suno' },
-      { time: 12, text: 'Mujhe pyar hua tha, iqraar hua tha' },
-      { time: 20, text: 'Deewana hua mastaana hua' },
-      { time: 28, text: 'Teri chahat mein kitna fasaana hua' },
-      { time: 37, text: 'Tere aane se pehle kuch na tha mera' },
-      { time: 46, text: 'Tere jaane ke baad kya wajood mera' }
-    ],
-    genre: 'Indie Soul',
-    mood: 'Melancholic',
-    isLiked: false,
-    isFollowing: false,
-    isDownloaded: false
-  },
-  {
-    id: 's9',
-    title: 'Lover',
-    artist: 'Diljit Dosanjh',
-    album: 'MoonChild Era',
-    duration: 198,
-    audioUrl: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3',
-    albumArt: 'https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/8a/89/e4/8a89e445-d2c6-f8ac-a828-27818b0c1afe/859749638209_cover.jpg/600x600bb.jpg',
-    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',
-    likesCount: '2.4M',
-    commentsCount: '31.2K',
+    likesCount: '4.8M',
+    commentsCount: '78.2K',
     bpm: '132 BPM',
     credits: {
-      composer: 'Intense',
-      lyricist: 'Raj Ranjodh',
-      producer: 'Diljit Dosanjh Music',
-      releaseYear: '2021'
+      composer: 'Yo Yo Honey Singh',
+      lyricist: 'Leo Grewal',
+      producer: 'T-Series',
+      releaseYear: '2024'
     },
     lyrics: [
-      { time: 0, text: '♪ Lover - Diljit Dosanjh ♪' },
-      { time: 5, text: 'Tera ni lover, tera ni lover' },
-      { time: 11, text: 'Karda pyaar tenu kinna saara' },
-      { time: 17, text: 'Vekh le akhiyan vich tu yaara' },
-      { time: 23, text: 'Tere bina lagda nahi dil mera' },
-      { time: 29, text: 'Tu hi ban gayi ae sahara' },
-      { time: 35, text: 'Tera ni lover, tera ni lover!' }
+      { time: 0, text: '♪ Millionaire - Yo Yo Honey Singh ♪' },
+      { time: 6, text: 'She say she love my vibe' },
+      { time: 14, text: 'She wanna ride or die' },
+      { time: 22, text: 'Gaddi vich bajjde bass heavy' }
     ],
-    genre: 'Punjabi Pop',
-    mood: 'Upbeat',
+    genre: 'Desi Hip-Hop',
+    mood: 'High Energy',
     isLiked: true,
     isFollowing: true,
     isDownloaded: true
+  },
+  {
+    id: 'aujla_szn',
+    title: 'Aujla Szn',
+    artist: 'Karan Aujla, MXRCI',
+    album: 'AUJLA SZN 1',
+    duration: 218,
+    audioUrl: 'https://aac.saavncdn.com/918/4b45117b680211704c642063d0e5ef2b_320.mp4',
+    albumArt: 'https://c.saavncdn.com/918/AUJLA-SZN-1-Punjabi-2026-20260930131343-500x500.jpg',
+    videoUri: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+    likesCount: '2.5M',
+    commentsCount: '41.7K',
+    bpm: '126 BPM',
+    credits: {
+      composer: 'MXRCI',
+      lyricist: 'Karan Aujla',
+      producer: 'Karan Aujla Music',
+      releaseYear: '2026'
+    },
+    lyrics: [
+      { time: 0, text: '♪ Aujla Szn - Karan Aujla ♪' },
+      { time: 8, text: 'Munde karde ne copy mera style' },
+      { time: 16, text: 'Geetan vich bolda swag pura' }
+    ],
+    genre: 'Punjabi Hip-Hop',
+    mood: 'Swagger',
+    isLiked: false,
+    isFollowing: false,
+    isDownloaded: false
   }
 ]
 
@@ -373,6 +252,18 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState(null)
   const [floatingHearts, setFloatingHearts] = useState([])
 
+  // Recently Played & Playback Persistence
+  const [recentlyPlayed, setRecentlyPlayed] = useState(() => {
+    try {
+      const saved = localStorage.getItem('resso_recently_played')
+      return saved ? JSON.parse(saved) : []
+    } catch (e) {
+      return []
+    }
+  })
+  const [libraryFilter, setLibraryFilter] = useState('all') // 'all', 'recent', 'liked'
+  const lastSavedPosRef = useRef(0)
+
   // Search
   const [searchQuery, setSearchQuery] = useState('')
   const [isSearchingOnline, setIsSearchingOnline] = useState(false)
@@ -408,6 +299,107 @@ export default function App() {
     setToastMessage(msg)
     setTimeout(() => setToastMessage(null), 2800)
   }
+
+  // Helper to persist current playback state to localStorage
+  const saveCurrentPlaybackState = (posOverride) => {
+    if (!currentSong) return
+    const pos = typeof posOverride === 'number' ? posOverride : (audioRef.current?.currentTime || currentTime || 0)
+    try {
+      localStorage.setItem('resso_last_state', JSON.stringify({
+        song: currentSong,
+        time: Math.floor(pos),
+        index: currentSongIndex,
+        songs: songs.slice(0, 50),
+        timestamp: Date.now()
+      }))
+    } catch (e) {}
+  }
+
+  // Manage Recently Played History
+  const addToRecentlyPlayed = (song, position = 0) => {
+    if (!song || !song.title) return
+    setRecentlyPlayed(prev => {
+      const filtered = prev.filter(s => s.id !== song.id && s.title !== song.title)
+      const updated = [
+        {
+          ...song,
+          lastPlayedAt: Date.now(),
+          lastPosition: Math.floor(position || 0)
+        },
+        ...filtered
+      ].slice(0, 30)
+      try {
+        localStorage.setItem('resso_recently_played', JSON.stringify(updated))
+      } catch (e) {}
+      return updated
+    })
+  }
+
+  const clearRecentlyPlayed = (e) => {
+    if (e) e.stopPropagation()
+    setRecentlyPlayed([])
+    try {
+      localStorage.removeItem('resso_recently_played')
+    } catch (e) {}
+    showToast('🗑️ Recent history cleared')
+  }
+
+  // Auto-Resume playback from exact timestamp on initial app launch
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('resso_last_state')
+      if (saved) {
+        const data = JSON.parse(saved)
+        if (data && data.song && data.song.audioUrl) {
+          if (Array.isArray(data.songs) && data.songs.length > 0) {
+            setSongs(data.songs)
+          }
+          const songIdx = typeof data.index === 'number' && data.index >= 0 ? data.index : 0
+          setCurrentSongIndex(songIdx)
+          const savedTime = data.time || 0
+          setCurrentTime(savedTime)
+          if (data.song.duration) {
+            setDuration(data.song.duration)
+          }
+          setTimeout(() => {
+            if (audioRef.current) {
+              audioRef.current.currentTime = savedTime
+            }
+          }, 300)
+          const m = Math.floor(savedTime / 60)
+          const s = Math.floor(savedTime % 60).toString().padStart(2, '0')
+          showToast(`⏱️ Resumed "${data.song.title}" from ${m}:${s}`)
+          return
+        }
+      }
+    } catch (e) {}
+
+    // First time launch: Payal (track 0) is ready to play
+    showToast('🔥 Ready to Play: "Payal" by Honey Singh & Paradox')
+  }, [])
+
+  // Auto-save on page minimize, background or window unload
+  useEffect(() => {
+    const onUnload = () => saveCurrentPlaybackState()
+    const onVisibility = () => {
+      if (document.visibilityState === 'hidden') {
+        saveCurrentPlaybackState()
+      }
+    }
+    window.addEventListener('beforeunload', onUnload)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      window.removeEventListener('beforeunload', onUnload)
+      document.removeEventListener('visibilitychange', onVisibility)
+    }
+  }, [currentSong, currentSongIndex, currentTime, songs])
+
+  // Track into Recently Played whenever current song changes
+  useEffect(() => {
+    if (currentSong) {
+      addToRecentlyPlayed(currentSong, currentTime)
+    }
+  }, [currentSongIndex])
 
   // Real-Time Physical Back Torch Flash Synchronizer (Resso Beat Flash Mode)
   useEffect(() => {
@@ -547,66 +539,49 @@ export default function App() {
     }
   }, [isPlaying, showVideo])
 
-  // Real-Time Progress & Full Song Playback Tracking
-  useEffect(() => {
-    if (!isPlaying) return
-
-    const ticker = setInterval(() => {
-      if (ytPlayerRef.current && isYtReady) {
-        try {
-          const curr = ytPlayerRef.current.getCurrentTime()
-          const dur = ytPlayerRef.current.getDuration()
-          if (curr !== undefined && curr >= 0) {
-            setCurrentTime(Math.floor(curr))
-          }
-          if (dur && dur > 1) {
-            setDuration(Math.floor(dur))
-          }
-        } catch (e) {}
-      } else {
-        const targetDuration = currentSong?.duration || 260
-        setCurrentTime(prev => {
-          const next = prev + 1
-          if (next >= targetDuration) {
-            if (repeatMode === 2) {
-              if (audioRef.current) audioRef.current.currentTime = 0
-              return 0
-            } else {
-              handleNextSong()
-              return 0
-            }
-          }
-          return next
-        })
-      }
-    }, 500)
-
-    return () => clearInterval(ticker)
-  }, [isPlaying, isYtReady, currentSongIndex, repeatMode, currentSong?.duration])
-
+  // Native Direct Audio Time & Duration Sync
   const handleTimeUpdate = () => {
-    // Keep local buffer alive without truncating full song duration
-  }
-
-  const handleAudioEnded = () => {
-    // Handled by YouTube onStateChange ended event.
-    // If running in offline audio fallback:
-    if (!isYtReady) {
-      const fullDur = currentSong?.duration || 260
-      if (repeatMode === 2) {
-        if (audioRef.current) {
-          audioRef.current.currentTime = 0
-          audioRef.current.play().catch(() => {})
+    if (audioRef.current) {
+      const cur = audioRef.current.currentTime
+      const dur = audioRef.current.duration
+      if (!isNaN(cur) && cur >= 0) {
+        setCurrentTime(cur)
+        // Throttle state saving to every ~1.5s
+        if (Math.abs(cur - (lastSavedPosRef.current || 0)) >= 1.5) {
+          lastSavedPosRef.current = cur
+          saveCurrentPlaybackState(cur)
         }
-      } else if (currentTime < fullDur - 4) {
-        if (audioRef.current && isPlaying) {
-          audioRef.current.currentTime = 0
-          audioRef.current.play().catch(() => {})
-        }
-      } else {
-        handleNextSong()
+      }
+      if (!isNaN(dur) && dur > 1) {
+        setDuration(dur)
       }
     }
+  }
+
+  // End of track - Continuous Autoplay
+  const handleAudioEnded = () => {
+    if (repeatMode === 2) {
+      if (audioRef.current) {
+        audioRef.current.currentTime = 0
+        audioRef.current.play().catch(() => {})
+      }
+    } else {
+      handleNextSong()
+    }
+  }
+
+  // Accurate Seek without modulo wrap
+  const handleSeek = (newTime) => {
+    const targetDur = duration || currentSong?.duration || 226
+    const clamped = Math.max(0, Math.min(newTime, targetDur))
+    setCurrentTime(clamped)
+    if (audioRef.current) {
+      audioRef.current.currentTime = clamped
+      if (isPlaying) {
+        audioRef.current.play().catch(() => {})
+      }
+    }
+    saveCurrentPlaybackState(clamped)
   }
 
   const handleNextSong = () => {
@@ -638,38 +613,21 @@ export default function App() {
     const next = !isPlaying
     setIsPlaying(next)
     if (next) {
-      if (ytPlayerRef.current && isYtReady) {
-        try { ytPlayerRef.current.playVideo() } catch (e) {}
+      if (audioRef.current) {
+        if (currentTime > 0 && Math.abs(audioRef.current.currentTime - currentTime) > 1) {
+          audioRef.current.currentTime = currentTime
+        }
+        audioRef.current.play().catch(() => {})
       }
-      if (audioRef.current) audioRef.current.play().catch(() => {})
       if (videoRef.current && showVideo) videoRef.current.play().catch(() => {})
     } else {
-      if (ytPlayerRef.current && isYtReady) {
-        try { ytPlayerRef.current.pauseVideo() } catch (e) {}
-      }
       if (audioRef.current) audioRef.current.pause()
       if (videoRef.current) videoRef.current.pause()
+      saveCurrentPlaybackState()
     }
   }
 
-  const handleSeek = (newTime) => {
-    const targetDur = duration || currentSong?.duration || 260
-    const clamped = Math.max(0, Math.min(newTime, targetDur))
-    setCurrentTime(clamped)
-    if (ytPlayerRef.current && isYtReady) {
-      try {
-        ytPlayerRef.current.seekTo(clamped, true)
-      } catch (e) {}
-    }
-    if (audioRef.current) {
-      const audioDuration = audioRef.current.duration || 30
-      audioRef.current.currentTime = clamped % audioDuration
-      if (isPlaying) audioRef.current.play().catch(() => {})
-    }
-    if (videoRef.current && showVideo) {
-      videoRef.current.currentTime = clamped % 40
-    }
-  }
+// handleSeek defined above
 
   // Keep fresh references for lock screen action handlers
   useEffect(() => {
@@ -1004,7 +962,40 @@ export default function App() {
     setDuration(songObj.duration)
     setIsPlaying(true)
     setCurrentTab('foryou')
+    addToRecentlyPlayed(songObj, 0)
     showToast(`Playing: "${songObj.title}" 🎵`)
+  }
+
+  // 1-Tap Resume or Play for Recently Played tracks
+  const resumeOrPlayTrack = (track) => {
+    const existingIdx = songs.findIndex(s => s.id === track.id || (s.title === track.title && s.artist === track.artist))
+    const resumePos = track.lastPosition || 0
+    if (existingIdx >= 0) {
+      setCurrentSongIndex(existingIdx)
+      setCurrentTime(resumePos)
+      setIsPlaying(true)
+      setCurrentTab('foryou')
+      setTimeout(() => {
+        if (audioRef.current) {
+          audioRef.current.currentTime = resumePos
+          audioRef.current.play().catch(() => {})
+        }
+      }, 200)
+      if (resumePos > 3) {
+        showToast(`⏱️ Resumed "${track.title}" from ${formatTime(resumePos)}`)
+      } else {
+        showToast(`Playing "${track.title}" 🎵`)
+      }
+    } else {
+      playSelectedSong(track)
+      if (resumePos > 3) {
+        setTimeout(() => {
+          if (audioRef.current) {
+            audioRef.current.currentTime = resumePos
+          }
+        }, 300)
+      }
+    }
   }
 
   const formatTime = (secs) => {
@@ -1024,6 +1015,14 @@ export default function App() {
       <audio
         ref={audioRef}
         src={currentSong?.audioUrl}
+        onLoadedMetadata={() => {
+          if (currentTime > 0 && audioRef.current && Math.abs(audioRef.current.currentTime - currentTime) > 1) {
+            audioRef.current.currentTime = currentTime
+          }
+          if (audioRef.current && audioRef.current.duration > 1) {
+            setDuration(audioRef.current.duration)
+          }
+        }}
         onTimeUpdate={handleTimeUpdate}
         onEnded={handleAudioEnded}
         onWaiting={() => {
@@ -1072,6 +1071,10 @@ export default function App() {
 
       {/* Floating Header Badges */}
       <div className="absolute top-2 left-3 z-30 flex items-center gap-2">
+        <div className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-500/20 to-orange-500/20 border border-amber-500/30 text-[9px] text-amber-300 font-bold backdrop-blur-md shadow-sm">
+          <Music className="w-2.5 h-2.5 text-amber-400" />
+          <span>320 kbps Ultra HD</span>
+        </div>
         <button
           onClick={() => setIsDataMonitorOpen(true)}
           className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-black/60 backdrop-blur-md border border-emerald-500/30 text-[9px] text-emerald-400 font-mono active:scale-95 transition cursor-pointer"
@@ -1557,35 +1560,38 @@ export default function App() {
 
         {/* TAB 2: EXPLORE / SEARCH (Clean Cloud Stream) */}
         {currentTab === 'explore' && (
-          <div className="flex-1 flex flex-col p-4 pt-10 overflow-y-auto no-scrollbar z-20">
+          <div className="flex-1 flex flex-col p-4 pt-10 overflow-y-auto no-scrollbar z-20 pb-24">
             <div className="flex items-center justify-between mb-4">
               <div>
-                <h1 className="text-xl font-black text-white">Search & Discover</h1>
-                <p className="text-xs text-white/50">Cloud Music • Low-latency stream</p>
+                <h1 className="text-xl font-black text-white flex items-center gap-2">
+                  <span>Search & Discover</span>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[#FF2A6D]/20 text-[#FF2A6D] border border-[#FF2A6D]/30">320 KBPS</span>
+                </h1>
+                <p className="text-xs text-white/50">Instant High-Fidelity Music Streaming</p>
               </div>
               <button
                 onClick={() => setIsSidebarOpen(true)}
-                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white"
+                className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-white active:scale-95 transition"
               >
                 <Sliders className="w-4 h-4" />
               </button>
             </div>
 
             {/* Search Input */}
-            <div className="relative mb-4">
+            <div className="relative mb-3">
               <Search className="w-4 h-4 text-[#FF2A6D] absolute left-3.5 top-1/2 transform -translate-y-1/2" />
               <input
                 type="text"
-                placeholder="Search any song, artist or mood..."
+                placeholder="Search any song, artist, album or mood..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && searchOnline(searchQuery)}
-                className="w-full bg-[#160E21] border border-white/10 rounded-2xl py-2.5 pl-10 pr-9 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[#FF2A6D]"
+                className="w-full bg-[#160E21] border border-white/15 rounded-2xl py-2.5 pl-10 pr-9 text-xs text-white placeholder-white/40 focus:outline-none focus:border-[#FF2A6D] transition shadow-inner"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50"
+                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
@@ -1594,58 +1600,314 @@ export default function App() {
 
             {/* Trending Quick Chips */}
             <div className="flex gap-2 overflow-x-auto no-scrollbar pb-3">
-              {['Arijit Singh', 'Sidhu Moose Wala', 'Coke Studio', 'AP Dhillon', 'Diljit Dosanjh', 'Lofi Vibe'].map(chip => (
-                <button
-                  key={chip}
-                  onClick={() => {
-                    setSearchQuery(chip)
-                    searchOnline(chip)
-                  }}
-                  className="px-3 py-1.5 rounded-full bg-white/10 text-white text-xs whitespace-nowrap active:scale-95 transition"
-                >
-                  {chip}
-                </button>
-              ))}
+              {['🔥 Payal', '⚡ Tauba Tauba', '💃 Aaj Ki Raat', '✨ Kesariya', '👑 Honey Singh', '🔥 Karan Aujla', '🎤 Arijit Singh', '🌟 Sidhu Moose Wala', '🎧 Diljit Dosanjh'].map(chip => {
+                const queryText = chip.replace(/^[^\w\s]+/, '').trim()
+                return (
+                  <button
+                    key={chip}
+                    onClick={() => {
+                      setSearchQuery(queryText)
+                      searchOnline(queryText)
+                    }}
+                    className="px-3 py-1.5 rounded-full bg-white/10 hover:bg-[#FF2A6D]/20 border border-white/10 hover:border-[#FF2A6D]/40 text-white text-xs whitespace-nowrap active:scale-95 transition font-medium"
+                  >
+                    {chip}
+                  </button>
+                )
+              })}
             </div>
 
             {/* Search Results */}
             {isSearchingOnline ? (
-              <div className="py-12 flex flex-col items-center justify-center gap-3">
-                <div className="w-8 h-8 border-2 border-[#FF2A6D] border-t-transparent rounded-full animate-spin" />
-                <span className="text-xs text-white/60">Searching music catalog...</span>
+              <div className="py-16 flex flex-col items-center justify-center gap-3">
+                <div className="w-9 h-9 border-2 border-[#FF2A6D] border-t-transparent rounded-full animate-spin" />
+                <span className="text-xs text-white/70 font-medium">Fetching 320kbps audio tracks...</span>
               </div>
             ) : onlineResults.length > 0 ? (
-              <div className="space-y-2 mt-2">
-                <div className="text-xs font-bold text-[#05D9E8] mb-2 tracking-wider">
-                  STREAM RESULTS ({onlineResults.length})
+              <div className="space-y-2 mt-1">
+                <div className="flex items-center justify-between text-xs font-bold text-[#05D9E8] mb-2 tracking-wider">
+                  <span>STREAM RESULTS ({onlineResults.length})</span>
+                  <span className="text-[10px] text-white/50">320kbps Full Songs</span>
                 </div>
                 {onlineResults.map((item, idx) => (
                   <div
                     key={idx}
                     onClick={() => playSelectedSong(item)}
-                    className="flex items-center gap-3 p-2 rounded-2xl bg-[#160E21] border border-white/5 active:bg-[#FF2A6D]/20 cursor-pointer transition"
+                    className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#160E21] border border-white/5 hover:border-white/20 active:bg-[#FF2A6D]/20 cursor-pointer transition shadow"
                   >
                     <img
                       src={item.albumArt}
                       alt={item.title}
-                      className="w-12 h-12 rounded-xl object-cover"
+                      className="w-12 h-12 rounded-xl object-cover shadow"
                     />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-white truncate">{item.title}</div>
                       <div className="text-[11px] text-white/60 truncate">{item.artist}</div>
-                      <div className="text-[9px] text-[#05D9E8] font-semibold mt-0.5">
-                        Online • Full Audio
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-[9px] text-emerald-400 font-bold px-1.5 py-0.2 rounded bg-emerald-500/10">320kbps</span>
+                        <span className="text-[9px] text-white/40">{item.album}</span>
                       </div>
                     </div>
-                    <div className="w-8 h-8 rounded-full bg-[#FF2A6D]/20 flex items-center justify-center text-[#FF2A6D]">
+                    <div className="w-8 h-8 rounded-full bg-[#FF2A6D] text-white flex items-center justify-center shadow-lg active:scale-90 transition">
                       <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <div className="space-y-3 mt-2">
-                <div className="text-xs font-bold text-white/70 tracking-wider">HOT ON RESSO</div>
+              <div className="space-y-5 mt-1">
+                {/* 1. RECENTLY PLAYED SECTION */}
+                {recentlyPlayed.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2.5">
+                      <div className="flex items-center gap-1.5 text-xs font-black text-white tracking-wider">
+                        <Clock className="w-3.5 h-3.5 text-[#FF2A6D]" />
+                        <span>RECENTLY PLAYED</span>
+                        <span className="text-[10px] text-white/40 font-normal">({recentlyPlayed.length})</span>
+                      </div>
+                      <button
+                        onClick={clearRecentlyPlayed}
+                        className="text-[10px] text-white/40 hover:text-[#FF2A6D] transition font-medium px-2 py-0.5 rounded-full hover:bg-white/5"
+                      >
+                        Clear
+                      </button>
+                    </div>
+
+                    <div className="flex gap-3 overflow-x-auto no-scrollbar pb-2 -mx-1 px-1">
+                      {recentlyPlayed.map((item) => (
+                        <div
+                          key={item.id || item.title}
+                          onClick={() => resumeOrPlayTrack(item)}
+                          className="flex-shrink-0 w-28 group cursor-pointer"
+                        >
+                          <div className="relative w-28 h-28 rounded-2xl overflow-hidden mb-1.5 border border-white/10 group-hover:border-[#FF2A6D]/60 transition shadow-lg">
+                            <img
+                              src={item.albumArt}
+                              alt={item.title}
+                              className="w-full h-full object-cover group-hover:scale-105 transition duration-300"
+                            />
+                            <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-90" />
+                            <div className="absolute right-2 bottom-2 w-7 h-7 rounded-full bg-[#FF2A6D] text-white flex items-center justify-center shadow-lg group-hover:scale-110 active:scale-95 transition">
+                              <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                            </div>
+                            {item.lastPosition > 3 && (
+                              <div className="absolute left-2 top-2 px-1.5 py-0.5 rounded-full bg-black/70 backdrop-blur-md text-[9px] font-bold text-[#05D9E8] border border-[#05D9E8]/30">
+                                {formatTime(item.lastPosition)}
+                              </div>
+                            )}
+                          </div>
+                          <div className="text-xs font-bold text-white truncate group-hover:text-[#FF2A6D] transition">
+                            {item.title}
+                          </div>
+                          <div className="text-[10px] text-white/50 truncate">
+                            {item.artist}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. TRENDING NOW & POPULAR CHART */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <div className="flex items-center gap-1.5 text-xs font-black text-white tracking-wider">
+                      <Zap className="w-3.5 h-3.5 text-[#05D9E8]" />
+                      <span>TRENDING HITS 2026</span>
+                    </div>
+                    <span className="text-[10px] text-emerald-400 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full border border-emerald-500/20">
+                      320 KBPS ULTRA HD
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    {songs.map((s, idx) => (
+                      <div
+                        key={s.id}
+                        onClick={() => {
+                          setCurrentSongIndex(idx)
+                          setCurrentTime(0)
+                          setIsPlaying(true)
+                          setCurrentTab('foryou')
+                        }}
+                        className={`flex items-center gap-3 p-2.5 rounded-2xl border transition cursor-pointer ${
+                          idx === currentSongIndex
+                            ? 'bg-gradient-to-r from-[#FF2A6D]/20 to-purple-900/20 border-[#FF2A6D]'
+                            : 'bg-[#160E21]/70 border-white/5 hover:border-white/20'
+                        }`}
+                      >
+                        <span className={`text-xs font-black w-4 text-center ${idx < 3 ? 'text-[#FF2A6D]' : 'text-white/40'}`}>
+                          #{idx + 1}
+                        </span>
+                        <img src={s.albumArt} alt={s.title} className="w-11 h-11 rounded-xl object-cover shadow" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-white truncate">{s.title}</div>
+                          <div className="text-[11px] text-white/60 truncate">{s.artist}</div>
+                          <div className="flex items-center gap-2 mt-0.5">
+                            <span className="text-[9px] text-[#05D9E8] font-bold">320kbps</span>
+                            <span className="text-[9px] text-white/30">•</span>
+                            <span className="text-[9px] text-white/40">{formatTime(s.duration)}</span>
+                          </div>
+                        </div>
+                        <div className="w-8 h-8 rounded-full bg-white/10 hover:bg-[#FF2A6D] text-white flex items-center justify-center active:scale-95 transition">
+                          <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 3: LIBRARY */}
+        {currentTab === 'library' && (
+          <div className="flex-1 flex flex-col p-4 pt-10 overflow-y-auto no-scrollbar z-20 pb-24">
+            <h1 className="text-xl font-black text-white mb-1">Your Library</h1>
+            <p className="text-xs text-white/60 mb-4">Saved playlists, recent plays & liked tracks</p>
+
+            {/* Quick Stat Cards */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              <div
+                onClick={() => setLibraryFilter('liked')}
+                className={`p-3 rounded-2xl border transition cursor-pointer ${
+                  libraryFilter === 'liked'
+                    ? 'bg-[#FF2A6D]/25 border-[#FF2A6D]'
+                    : 'bg-[#160E21]/60 border-white/10'
+                }`}
+              >
+                <Heart className="w-4 h-4 text-[#FF2A6D] fill-current mb-1.5" />
+                <div className="text-[11px] font-bold text-white">Liked</div>
+                <div className="text-[9px] text-white/60">{songs.filter(s => s.isLiked).length} tracks</div>
+              </div>
+
+              <div
+                onClick={() => setLibraryFilter('recent')}
+                className={`p-3 rounded-2xl border transition cursor-pointer ${
+                  libraryFilter === 'recent'
+                    ? 'bg-[#05D9E8]/25 border-[#05D9E8]'
+                    : 'bg-[#160E21]/60 border-white/10'
+                }`}
+              >
+                <Clock className="w-4 h-4 text-[#05D9E8] mb-1.5" />
+                <div className="text-[11px] font-bold text-white">Recent</div>
+                <div className="text-[9px] text-white/60">{recentlyPlayed.length} songs</div>
+              </div>
+
+              <div
+                onClick={() => setLibraryFilter('all')}
+                className={`p-3 rounded-2xl border transition cursor-pointer ${
+                  libraryFilter === 'all'
+                    ? 'bg-purple-600/25 border-purple-500'
+                    : 'bg-[#160E21]/60 border-white/10'
+                }`}
+              >
+                <Music className="w-4 h-4 text-purple-400 mb-1.5" />
+                <div className="text-[11px] font-bold text-white">All Tracks</div>
+                <div className="text-[9px] text-white/60">{songs.length} songs</div>
+              </div>
+            </div>
+
+            {/* Filter Tabs */}
+            <div className="flex gap-2 mb-3 border-b border-white/10 pb-2">
+              {[
+                { id: 'all', label: 'All Tracks' },
+                { id: 'recent', label: `Recently Played (${recentlyPlayed.length})` },
+                { id: 'liked', label: `Liked (${songs.filter(s => s.isLiked).length})` }
+              ].map(f => (
+                <button
+                  key={f.id}
+                  onClick={() => setLibraryFilter(f.id)}
+                  className={`px-3 py-1 rounded-full text-xs font-bold transition active:scale-95 ${
+                    libraryFilter === f.id
+                      ? 'bg-[#FF2A6D] text-white'
+                      : 'bg-white/5 text-white/60 hover:text-white'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* List Content based on filter */}
+            {libraryFilter === 'recent' ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[11px] font-bold text-white/70">RECENTLY PLAYED SONGS</span>
+                  {recentlyPlayed.length > 0 && (
+                    <button
+                      onClick={clearRecentlyPlayed}
+                      className="text-[10px] text-white/40 hover:text-[#FF2A6D]"
+                    >
+                      Clear All
+                    </button>
+                  )}
+                </div>
+
+                {recentlyPlayed.length === 0 ? (
+                  <div className="py-12 text-center text-xs text-white/40">
+                    No recently played tracks yet.<br/>Play any song to see it here!
+                  </div>
+                ) : (
+                  recentlyPlayed.map((s) => (
+                    <div
+                      key={s.id || s.title}
+                      onClick={() => resumeOrPlayTrack(s)}
+                      className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#160E21]/60 border border-white/5 hover:border-[#FF2A6D]/40 transition cursor-pointer"
+                    >
+                      <img src={s.albumArt} alt={s.title} className="w-11 h-11 rounded-xl object-cover" />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-bold text-white truncate">{s.title}</div>
+                        <div className="text-[11px] text-white/60 truncate">{s.artist}</div>
+                        {s.lastPosition > 3 && (
+                          <div className="text-[9px] text-[#05D9E8] font-bold mt-0.5">
+                            ⏱️ Paused at {formatTime(s.lastPosition)} • Tap to Resume
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-8 h-8 rounded-full bg-[#FF2A6D]/20 text-[#FF2A6D] flex items-center justify-center">
+                        <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : libraryFilter === 'liked' ? (
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-white/70 mb-1">YOUR LIKED SONGS</div>
+                {songs.filter(s => s.isLiked).length === 0 ? (
+                  <div className="py-12 text-center text-xs text-white/40">
+                    No liked songs yet.<br/>Tap ❤️ on any song to add it!
+                  </div>
+                ) : (
+                  songs.filter(s => s.isLiked).map((s) => {
+                    const idx = songs.findIndex(item => item.id === s.id)
+                    return (
+                      <div
+                        key={s.id}
+                        onClick={() => {
+                          setCurrentSongIndex(idx >= 0 ? idx : 0)
+                          setCurrentTime(0)
+                          setIsPlaying(true)
+                          setCurrentTab('foryou')
+                        }}
+                        className="flex items-center gap-3 p-2.5 rounded-2xl bg-[#160E21]/60 border border-white/5 hover:border-[#FF2A6D]/40 transition cursor-pointer"
+                      >
+                        <img src={s.albumArt} alt={s.title} className="w-11 h-11 rounded-xl object-cover" />
+                        <div className="flex-1 min-w-0">
+                          <div className="text-xs font-bold text-white truncate">{s.title}</div>
+                          <div className="text-[11px] text-white/60 truncate">{s.artist}</div>
+                        </div>
+                        <Heart className="w-4 h-4 text-[#FF2A6D] fill-current mr-2" />
+                      </div>
+                    )
+                  })
+                )}
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <div className="text-[11px] font-bold text-white/70 mb-1">ALL TRACKS IN QUEUE</div>
                 {songs.map((s, idx) => (
                   <div
                     key={s.id}
@@ -1655,84 +1917,33 @@ export default function App() {
                       setIsPlaying(true)
                       setCurrentTab('foryou')
                     }}
-                    className="flex items-center gap-3 p-2 rounded-2xl bg-[#160E21]/60 border border-white/5 cursor-pointer"
+                    className={`flex items-center gap-3 p-2.5 rounded-2xl border transition cursor-pointer ${
+                      idx === currentSongIndex
+                        ? 'bg-[#FF2A6D]/20 border-[#FF2A6D]'
+                        : 'bg-[#160E21]/60 border-white/5'
+                    }`}
                   >
-                    <img src={s.albumArt} alt={s.title} className="w-11 h-11 rounded-xl object-cover" />
+                    <img src={s.albumArt} alt={s.title} className="w-10 h-10 rounded-xl object-cover" />
                     <div className="flex-1 min-w-0">
                       <div className="text-xs font-bold text-white truncate">{s.title}</div>
                       <div className="text-[11px] text-white/60 truncate">{s.artist}</div>
                     </div>
-                    <div className="w-7 h-7 rounded-full bg-white/10 flex items-center justify-center text-white">
-                      <Play className="w-3.5 h-3.5 fill-current ml-0.5" />
-                    </div>
+                    {s.isDownloaded && (
+                      <span className="text-[9px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/20">
+                        OFFLINE
+                      </span>
+                    )}
+                    {idx === currentSongIndex && isPlaying && (
+                      <div className="flex gap-1 items-end h-3 mr-2">
+                        <div className="w-1 bg-[#FF2A6D] h-full animate-pulse" />
+                        <div className="w-1 bg-[#FF2A6D] h-2/3 animate-bounce" />
+                        <div className="w-1 bg-[#FF2A6D] h-4/5 animate-pulse" />
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
             )}
-          </div>
-        )}
-
-        {/* TAB 3: LIBRARY */}
-        {currentTab === 'library' && (
-          <div className="flex-1 flex flex-col p-4 pt-10 overflow-y-auto no-scrollbar z-20">
-            <h1 className="text-xl font-black text-white mb-1">Your Library</h1>
-            <p className="text-xs text-white/60 mb-4">Saved playlists, offline tracks & favorites</p>
-
-            <div className="grid grid-cols-2 gap-3 mb-5">
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-[#FF2A6D]/30 to-[#9B5DE5]/20 border border-white/10">
-                <Heart className="w-5 h-5 text-[#FF2A6D] fill-current mb-2" />
-                <div className="text-xs font-bold">Liked Songs</div>
-                <div className="text-[10px] text-white/60">
-                  {songs.filter(s => s.isLiked).length} songs
-                </div>
-              </div>
-
-              <div className="p-3.5 rounded-2xl bg-gradient-to-br from-emerald-500/30 to-teal-500/20 border border-white/10">
-                <Download className="w-5 h-5 text-emerald-400 mb-2" />
-                <div className="text-xs font-bold">Offline Downloads</div>
-                <div className="text-[10px] text-white/60">
-                  {songs.filter(s => s.isDownloaded).length} tracks
-                </div>
-              </div>
-            </div>
-
-            <div className="text-xs font-bold text-white/70 mb-2.5 tracking-wider">ALL TRACKS</div>
-            <div className="space-y-2">
-              {songs.map((s, idx) => (
-                <div
-                  key={s.id}
-                  onClick={() => {
-                    setCurrentSongIndex(idx)
-                    setCurrentTime(0)
-                    setIsPlaying(true)
-                    setCurrentTab('foryou')
-                  }}
-                  className={`flex items-center gap-3 p-2.5 rounded-2xl border transition cursor-pointer ${
-                    idx === currentSongIndex
-                      ? 'bg-[#FF2A6D]/20 border-[#FF2A6D]'
-                      : 'bg-[#160E21]/60 border-white/5'
-                  }`}
-                >
-                  <img src={s.albumArt} alt={s.title} className="w-10 h-10 rounded-xl object-cover" />
-                  <div className="flex-1 min-w-0">
-                    <div className="text-xs font-bold text-white truncate">{s.title}</div>
-                    <div className="text-[11px] text-white/60 truncate">{s.artist}</div>
-                  </div>
-                  {s.isDownloaded && (
-                    <span className="text-[9px] text-emerald-400 font-bold px-1.5 py-0.5 rounded bg-emerald-500/20">
-                      OFFLINE
-                    </span>
-                  )}
-                  {idx === currentSongIndex && isPlaying && (
-                    <div className="flex gap-1 items-end h-3 mr-2">
-                      <div className="w-1 bg-[#FF2A6D] h-full animate-pulse" />
-                      <div className="w-1 bg-[#FF2A6D] h-2/3 animate-bounce" />
-                      <div className="w-1 bg-[#FF2A6D] h-4/5 animate-pulse" />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
           </div>
         )}
       </div>
