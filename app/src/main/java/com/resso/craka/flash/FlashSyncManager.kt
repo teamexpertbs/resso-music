@@ -55,6 +55,14 @@ class FlashSyncManager(private val context: Context) {
         isBeatSyncRunning = true
     }
 
+    fun startSync(audioSessionId: Int = 0) {
+        if (audioSessionId > 0) {
+            startDirectSync()
+        } else {
+            startFallbackRhythm()
+        }
+    }
+
     fun startFallbackRhythm() {
         stopSync()
         isBeatSyncRunning = true

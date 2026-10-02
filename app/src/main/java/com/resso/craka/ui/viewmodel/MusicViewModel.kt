@@ -333,7 +333,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         publishPlayback(streamPlaying)
                     }
                     if (streamPlaying && _isFlashSyncEnabled.value) {
-                        val sess = player.audioSessionId; flashSyncManager.startSync(if (sess != C.AUDIO_SESSION_ID_UNSET && sess > 0) sess else 0)
+                        flashSyncManager.startFallbackRhythm()
                     } else if (!streamPlaying && !player.isPlaying) {
                         flashSyncManager.stopSync()
                     }
