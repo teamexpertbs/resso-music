@@ -121,8 +121,6 @@ class MusicRepository(context: Context) {
     suspend fun getPlaylist(id: Long) = playlistDao.getPlaylist(id)
 
     suspend fun saveForOffline(song: SongEntity): String {
-        if (song.id.startsWith("yt_") || song.audioUrl.contains("youtube.com") || song.audioUrl.contains("youtu.be")) {
-            return "YouTube songs can't be saved offline"
         }
         if (song.audioUrl.startsWith("file://") || song.audioUrl.startsWith("/")) {
             return "Already saved on this phone"

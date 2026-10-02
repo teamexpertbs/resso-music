@@ -39,9 +39,6 @@ android {
       }
       return raw.replace("\\", "\\\\").replace("\"", "\\\"")
     }
-    buildConfigField("String", "YOUTUBE_API_KEY", "\"${secretField("YOUTUBE_API_KEY")}\"")
-    buildConfigField("String", "SPOTIFY_CLIENT_ID", "\"${secretField("SPOTIFY_CLIENT_ID")}\"")
-    buildConfigField("String", "SPOTIFY_CLIENT_SECRET", "\"${secretField("SPOTIFY_CLIENT_SECRET")}\"")
   }
 
   signingConfigs {

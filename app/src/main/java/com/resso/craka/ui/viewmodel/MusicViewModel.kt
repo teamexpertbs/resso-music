@@ -277,14 +277,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         wasPlayingBeforeNetworkLost = false
                         val song = _currentSong.value ?: return@launch
                         _networkStatusMessage.value = "⚡ Internet वापस आ गया! गाना वहीं से जारी हो रहा है..."
-                        if (song.id.startsWith("yt_")) {
-                            startYoutube(song, autoPlay = true)
-                            streamPlayerManager.seekTo(savedPositionBeforeLost)
-                        } else {
-                            player.seekTo(savedPositionBeforeLost)
-                            player.play()
-                            _isPlaying.value = true
-                        }
+                        player.seekTo(savedPositionBeforeLost)
+                        player.play()
+                        _isPlaying.value = true
                         publishPlayback(true)
                     }
                 }
@@ -413,7 +408,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 // 1. Gather matching local songs
                 val localMatches = repository.searchLocalSongs(trimmed)
 
-                // 2. Search YouTube / Online songs (with full-length YouTube audio)
+                // 2. Search JioSaavn / 320kbps Online songs
                 val onlineMatches = repository.searchSongsOnline(trimmed)
 
                 // 3. Combine without duplicate entries
@@ -470,7 +465,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
             selectSong(song, queueIndex, autoPlay = autoPlay, queue = effectiveQueue)
 
-            // Spotify Autoplay buffer: Pre-fetch upcoming similar tracks
+            // Autoplay buffer: Pre-fetch upcoming similar tracks
             ensureAutoplayQueue(song)
         }
     }
@@ -580,26 +575,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         // Observe comments for this song
         observeCommentsForSong(song.id)
 
-        if (song.id.startsWith("yt_")) {
-            startYoutube(song, autoPlay)
-        } else {
-            // Standard media: pause Stream, play via ExoPlayer
-            streamPlayerManager.setKeepPlayingInBackground(false)
-            streamPlayerManager.pause()
-            _isVideoMode.value = false
-            try {
-                val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
-                player.setMediaItem(mediaItem)
-                player.prepare()
-                if (autoPlay) {
-                    player.play()
-                    _isPlaying.value = true
-                } else {
-                    _isPlaying.value = false
-                }
-            } catch (e: Exception) {
-                Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
+        _isVideoMode.value = false
+        try {
+            val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
+            player.setMediaItem(mediaItem)
+            player.prepare()
+            if (autoPlay) {
+                player.play()
+                _isPlaying.value = true
+            } else {
+                _isPlaying.value = false
             }
+        } catch (e: Exception) {
+            Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
         }
 
         if (needsRealLyrics(song.lyricsLrc)) {
@@ -609,27 +597,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         publishPlayback(autoPlay)
     }
 
-    private fun startYoutube(song: SongEntity, autoPlay: Boolean) {
-        // Stop and clear ExoPlayer completely to prevent dual audio playback
-        player.stop()
-        player.clearMediaItems()
-        val videoId = song.id.removePrefix("yt_")
-        if (!autoPlay) {
-            streamPlayerManager.setKeepPlayingInBackground(false)
-            streamPlayerManager.pause()
-            _isPlaying.value = false
-            return
-        }
-        _streamVisible.value = true
-        if (streamPlayerManager.activeVideoId() == videoId && streamPlayerManager.hasWebView()) {
-            streamPlayerManager.setKeepPlayingInBackground(true)
-            streamPlayerManager.play()
-        } else {
-            streamPlayerManager.loadAndPlay(videoId, true)
-        }
-        if (_isVolumeBoosterEnabled.value) streamPlayerManager.setBoost(true)
-        _isPlaying.value = true
-    }
+
 
     private fun hasInternet(): Boolean {
         val cm = connectivityManager ?: return false
@@ -658,9 +626,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resumePlayback() {
         val song = _currentSong.value ?: return
-        if (song.id.startsWith("yt_")) {
-            startYoutube(song, autoPlay = true)
-        } else if (!player.isPlaying) {
+        if (!player.isPlaying) {
             player.play()
             _isPlaying.value = true
         }
@@ -723,7 +689,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
         }
 
-        // Spotify Autoplay: If single-song queue or reached end of queue, never replay the same song!
+        // Autoplay: If single-song queue or reached end of queue, never replay the same song!
         if (songs.size <= 1 || currentIndex >= songs.lastIndex) {
             val candidate = (_trendingSongs.value + allSongs.value).firstOrNull { it.id != currentId && songs.none { s -> s.id == it.id } }
                 ?: (_trendingSongs.value + allSongs.value).firstOrNull { it.id != currentId }
