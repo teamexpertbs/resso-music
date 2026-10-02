@@ -410,10 +410,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 songToSelect = allSongs.value.firstOrNull()
             }
 
+            val shouldSeek = (lastId == songToSelect?.id && lastPos > 0L)
             songToSelect?.let { song ->
                 if (_currentSong.value == null) {
                     selectSong(song, 0, autoPlay = false)
-                    if (lastPos > 0L) {
+                    if (shouldSeek) {
                         delay(300)
                         seekTo(lastPos)
                     }
@@ -1147,6 +1148,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             allSongs.collect { local ->
                 _homeRows.value = buildHomeRows(local)
+                if (_currentSong.value == null && local.isNotEmpty()) {
+                    restoreLastPlaybackOrInitial(local)
+                }
             }
         }
     }
@@ -1170,6 +1174,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     override fun onCleared() {
         super.onCleared()
+        _currentSong.value?.let { song ->
+            playerPrefs.edit()
+                .putString("last_played_song_id", song.id)
+                .putLong("last_position_ms", _currentPositionMs.value)
+                .apply()
+        }
         appEqualizer.release()
         sleepJob?.cancel()
         try {

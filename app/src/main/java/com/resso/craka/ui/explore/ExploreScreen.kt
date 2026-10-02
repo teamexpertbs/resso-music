@@ -97,6 +97,7 @@ fun ExploreScreen(
     val searchHistory by viewModel.searchHistory.collectAsState()
     val pendingSearch by viewModel.pendingSearch.collectAsState()
     val homeRows by viewModel.homeRows.collectAsState()
+    val recentSongs by viewModel.recentSongs.collectAsState()
 
     var searchKeyword by remember { mutableStateOf("") }
     var selectedMood by remember { mutableStateOf<String?>(null) }
@@ -368,6 +369,57 @@ fun ExploreScreen(
                                 fontSize = 12.sp,
                                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
                             )
+                        }
+                    }
+                }
+            }
+
+            // When search query is blank: show Recently Played (हाल ही में बजाए गए)
+            if (searchKeyword.isBlank() && recentSongs.isNotEmpty()) {
+                item(key = "recently_played_shelf") {
+                    Column(modifier = Modifier.padding(vertical = 4.dp)) {
+                        Text(
+                            text = "Recently Played • हाल ही में बजाए गए",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 16.sp
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                            items(recentSongs.size) { index ->
+                                val song = recentSongs[index]
+                                Column(
+                                    modifier = Modifier
+                                        .width(112.dp)
+                                        .clickable {
+                                            viewModel.playSongFromAnywhere(song, autoPlay = true, queue = recentSongs)
+                                            onSongSelected()
+                                        }
+                                ) {
+                                    AlbumArtwork(
+                                        songId = song.id,
+                                        albumArtUrl = song.albumArtUrl,
+                                        contentDescription = song.title,
+                                        modifier = Modifier
+                                            .size(112.dp)
+                                            .clip(RoundedCornerShape(10.dp))
+                                    )
+                                    Text(
+                                        text = song.title,
+                                        color = Color.White,
+                                        fontSize = 12.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        maxLines = 1,
+                                        modifier = Modifier.padding(top = 6.dp)
+                                    )
+                                    Text(
+                                        text = song.artist,
+                                        color = RessoTextSecondary,
+                                        fontSize = 11.sp,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
                         }
                     }
                 }
