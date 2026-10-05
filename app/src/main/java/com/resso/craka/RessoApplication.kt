@@ -8,6 +8,7 @@ import coil.disk.DiskCache
 import coil.memory.MemoryCache
 import com.google.firebase.Firebase
 import com.google.firebase.initialize
+import com.google.firebase.auth.FirebaseAuth
 import com.resso.craka.data.firebase.FirebaseInitializer
 import com.resso.craka.data.repository.MusicRepository
 import okhttp3.OkHttpClient
@@ -34,10 +35,39 @@ class RessoApplication : Application(), ImageLoaderFactory {
         FirebaseInitializer.initialize()
         FirebaseInitializer.logConfiguration()
         
-        // Initialize music repository (which depends on Firebase being ready)
-        repository = MusicRepository(this)
-        
-        Log.i(tag, "RessoApplication onCreate complete. Firebase ready: ${FirebaseInitializer.isReady()}")
+        // Authenticate anonymously before starting the repository.
+        // Firestore rules can then use request.auth.uid safely.
+        val auth = FirebaseAuth.getInstance()
+
+        if (auth.currentUser != null) {
+            Log.i(tag, "Firebase Auth already signed in: ${auth.currentUser?.uid}")
+            repository = MusicRepository(this)
+            Log.i(tag, "RessoApplication onCreate complete. Firebase ready: ${FirebaseInitializer.isReady()}")
+        } else {
+            auth.signInAnonymously()
+                .addOnSuccessListener { result ->
+                    Log.i(tag, "Anonymous Firebase Auth successful: ${result.user?.uid}")
+
+                    // Start repository only after authentication succeeds.
+                    repository = MusicRepository(this)
+
+                    Log.i(
+                        tag,
+                        "RessoApplication onCreate complete. Firebase ready: ${FirebaseInitializer.isReady()}"
+                    )
+                }
+                .addOnFailureListener { error ->
+                    Log.e(tag, "Anonymous Firebase Auth failed: ${error.message}", error)
+
+                    // Keep the app usable even if Auth is temporarily unavailable.
+                    repository = MusicRepository(this)
+
+                    Log.i(
+                        tag,
+                        "RessoApplication started without authenticated Firestore access"
+                    )
+                }
+        }
     }
 
     override fun newImageLoader(): ImageLoader {

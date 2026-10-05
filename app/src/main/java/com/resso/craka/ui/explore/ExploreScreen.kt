@@ -236,7 +236,7 @@ fun ExploreScreen(
             query = searchKeyword,
             onQueryChange = { searchKeyword = it },
             filterType = filterType,
-            onFilterTypeChange = { viewModel.setSearchFilterType(it) },
+            onFilterChange = { viewModel.setSearchFilterType(it) },
             isSearching = isSearching || isFirestoreSearching,
             onSearchTriggered = {
                 focusManager.clearFocus()
