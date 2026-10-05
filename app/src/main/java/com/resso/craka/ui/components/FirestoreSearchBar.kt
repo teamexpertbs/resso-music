@@ -1,41 +1,25 @@
 package com.resso.craka.ui.components
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.CloudDone
-import androidx.compose.material.icons.filled.FilterList
-import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Title
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
-import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Surface
@@ -47,7 +31,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.resso.craka.ui.theme.RessoCardBg
@@ -56,28 +39,21 @@ import com.resso.craka.ui.theme.RessoSecondary
 import com.resso.craka.ui.theme.RessoSurface
 import com.resso.craka.ui.theme.RessoTextSecondary
 
-enum class SearchFilterType(val label: String) {
-    ALL("All"),
-    TITLE("By Title"),
-    ARTIST("By Artist")
+enum class SearchFilterType {
+    ALL, TITLE, ARTIST
 }
 
-/**
- * Material 3 Search Bar component that allows users to filter songs
- * by title or artist, integrating directly with the Firebase Firestore Repository.
- */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FirestoreSearchBar(
     query: String,
     onQueryChange: (String) -> Unit,
-    filterType: SearchFilterType,
-    onFilterTypeChange: (SearchFilterType) -> Unit,
-    isSearching: Boolean,
+    isSearching: Boolean = false,
+    filterType: SearchFilterType = SearchFilterType.ALL,
+    onFilterChange: (SearchFilterType) -> Unit = {},
     onSearchTriggered: (String) -> Unit,
     onClearQuery: () -> Unit,
     modifier: Modifier = Modifier,
-    placeholderText: String = "Search songs by title or artist in Firestore..."
+    placeholderText: String = "Search songs by title or artist..."
 ) {
     Surface(
         modifier = modifier
@@ -127,7 +103,7 @@ fun FirestoreSearchBar(
                     )
                     Spacer(modifier = Modifier.width(4.dp))
                     Text(
-                        text = "Project: sleepok",
+                        text = "resso-music-ad0cf",
                         color = RessoTextSecondary,
                         fontSize = 11.sp
                     )
@@ -189,87 +165,12 @@ fun FirestoreSearchBar(
                 shape = RoundedCornerShape(16.dp),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedBorderColor = RessoPrimary,
-                    unfocusedBorderColor = RessoCardBg,
-                    focusedContainerColor = RessoCardBg.copy(alpha = 0.8f),
-                    unfocusedContainerColor = RessoCardBg.copy(alpha = 0.5f),
-                    focusedTextColor = Color.White,
-                    unfocusedTextColor = Color.White,
-                    cursorColor = RessoPrimary
+                    unfocusedBorderColor = RessoCardBg
                 ),
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { onSearchTriggered(query) }),
                 modifier = Modifier
                     .fillMaxWidth()
                     .testTag("firestore_search_input")
             )
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            // Filter Chips: All, By Title, By Artist
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Icon(
-                    imageVector = Icons.Default.FilterList,
-                    contentDescription = "Filter By",
-                    tint = RessoTextSecondary,
-                    modifier = Modifier.size(16.dp)
-                )
-
-                SearchFilterType.values().forEach { type ->
-                    val isSelected = filterType == type
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = { onFilterTypeChange(type) },
-                        label = {
-                            Text(
-                                text = type.label,
-                                fontSize = 12.sp,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
-                            )
-                        },
-                        leadingIcon = {
-                            when (type) {
-                                SearchFilterType.ALL -> Icon(
-                                    imageVector = Icons.Default.Search,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                SearchFilterType.TITLE -> Icon(
-                                    imageVector = Icons.Default.Title,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                                SearchFilterType.ARTIST -> Icon(
-                                    imageVector = Icons.Default.Person,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(14.dp)
-                                )
-                            }
-                        },
-                        colors = FilterChipDefaults.filterChipColors(
-                            containerColor = RessoCardBg,
-                            selectedContainerColor = RessoPrimary,
-                            labelColor = RessoTextSecondary,
-                            selectedLabelColor = Color.White,
-                            iconColor = RessoTextSecondary,
-                            selectedLeadingIconColor = Color.White
-                        ),
-                        border = FilterChipDefaults.filterChipBorder(
-                            borderColor = if (isSelected) RessoPrimary else RessoCardBg,
-                            selectedBorderColor = RessoPrimary,
-                            enabled = true,
-                            selected = isSelected
-                        ),
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.testTag("filter_chip_${type.name.lowercase()}")
-                    )
-                }
-            }
         }
     }
 }

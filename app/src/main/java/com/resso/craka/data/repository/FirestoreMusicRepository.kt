@@ -5,7 +5,6 @@ import android.util.Log
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.Query
 import com.resso.craka.data.firebase.FirebaseMusicManager
-import com.resso.craka.data.firebase.SleepokFirestoreClient
 import com.resso.craka.data.model.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -17,14 +16,12 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.atomic.AtomicInteger
 
 /**
- * Repository class that fetches song metadata from Firebase Firestore (sleepok project),
- * ensuring that query results are dynamic rather than static to resolve the issue
- * where the same songs appear repeatedly.
+ * Repository class that fetches song metadata from Firebase Firestore (resso-music-ad0cf project).
+ * Uses dynamic queries to ensure variety in results.
  */
 class FirestoreMusicRepository(
     private val context: Context,
-    private val firebaseManager: FirebaseMusicManager,
-    private val sleepokClient: SleepokFirestoreClient = SleepokFirestoreClient()
+    private val firebaseManager: FirebaseMusicManager
 ) {
     companion object {
         private const val TAG = "FirestoreMusicRepo"
@@ -35,7 +32,7 @@ class FirestoreMusicRepository(
         try {
             FirebaseFirestore.getInstance()
         } catch (e: Exception) {
-            Log.w(TAG, "Native Firestore instance not ready: ${e.message}")
+            Log.w(TAG, "Firestore instance not ready: ${e.message}")
             null
         }
     }
@@ -44,83 +41,65 @@ class FirestoreMusicRepository(
 
     /**
      * Dynamically fetches songs from Firestore.
-     * Rotates sorting strategies and filters out recently played or specified IDs,
-     * ensuring dynamic, non-static song lists on every invocation.
+     * Rotates sorting strategies to ensure variety.
      */
-    suspend fun getDynamicSongs(limit: Int = 30, excludeIds: Set<String> = emptySet()): List<SongEntity> = withContext(Dispatchers.IO) {
-        val result = mutableListOf<SongEntity>()
+    suspend fun getDynamicSongs(limit: Int = 30, excludeIds: Set<String> = emptySet()): List<SongEntity> =
+        withContext(Dispatchers.IO) {
+            val result = mutableListOf<SongEntity>()
 
-        // 1. Dynamic query from native Firestore SDK with rotating orders
-        val db = firestore
-        if (db != null) {
-            try {
-                val sortFields = listOf("updatedAt", "durationMs", "title", "lastActive", "lastPlayedAt")
-                val selectedField = sortFields[dynamicQueryCounter.getAndIncrement() % sortFields.size]
-                val direction = if (dynamicQueryCounter.get() % 2 == 0) Query.Direction.DESCENDING else Query.Direction.ASCENDING
+            val db = firestore
+            if (db != null) {
+                try {
+                    val sortFields = listOf("updatedAt", "durationMs", "title", "lastPlayedAt")
+                    val selectedField = sortFields[dynamicQueryCounter.getAndIncrement() % sortFields.size]
+                    val direction =
+                        if (dynamicQueryCounter.get() % 2 == 0) Query.Direction.DESCENDING else Query.Direction.ASCENDING
 
-                val snapshot = try {
-                    db.collection(COLLECTION_SONGS)
-                        .orderBy(selectedField, direction)
-                        .limit((limit * 2).toLong())
-                        .get()
-                        .await()
-                } catch (_: Exception) {
-                    // Fallback to basic limit if compound index is pending
-                    db.collection(COLLECTION_SONGS)
-                        .limit((limit * 2).toLong())
-                        .get()
-                        .await()
-                }
+                    val snapshot = try {
+                        db.collection(COLLECTION_SONGS)
+                            .orderBy(selectedField, direction)
+                            .limit((limit * 2).toLong())
+                            .get()
+                            .await()
+                    } catch (_: Exception) {
+                        // Fallback to basic limit if compound index is pending
+                        db.collection(COLLECTION_SONGS)
+                            .limit((limit * 2).toLong())
+                            .get()
+                            .await()
+                    }
 
-                for (doc in snapshot.documents) {
-                    val id = doc.getString("id") ?: doc.id
-                    val audioUrl = doc.getString("audioUrl") ?: ""
-                    if (audioUrl.startsWith("http") && id !in excludeIds && result.none { it.id == id }) {
-                        result.add(
-                            SongEntity(
-                                id = id,
-                                title = doc.getString("title") ?: "Unknown Track",
-                                artist = doc.getString("artist") ?: "Various Artists",
-                                album = doc.getString("album") ?: "Single",
-                                durationMs = doc.getLong("durationMs") ?: 210000L,
-                                audioUrl = audioUrl,
-                                albumArtUrl = doc.getString("albumArtUrl") ?: "",
-                                lyricsLrc = doc.getString("lyricsLrc") ?: "",
-                                genre = doc.getString("genre") ?: "Bollywood",
-                                mood = doc.getString("mood") ?: "Chill"
+                    for (doc in snapshot.documents) {
+                        val id = doc.getString("id") ?: doc.id
+                        val audioUrl = doc.getString("audioUrl") ?: ""
+                        if (audioUrl.startsWith("http") && id !in excludeIds && result.none { it.id == id }) {
+                            result.add(
+                                SongEntity(
+                                    id = id,
+                                    title = doc.getString("title") ?: "Unknown Track",
+                                    artist = doc.getString("artist") ?: "Various Artists",
+                                    album = doc.getString("album") ?: "Single",
+                                    durationMs = doc.getLong("durationMs") ?: 210000L,
+                                    audioUrl = audioUrl,
+                                    albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                                    lyricsLrc = doc.getString("lyricsLrc") ?: "",
+                                    genre = doc.getString("genre") ?: "Bollywood",
+                                    mood = doc.getString("mood") ?: "Chill"
+                                )
                             )
-                        )
+                        }
+                        if (result.size >= limit) break
                     }
-                    if (result.size >= limit) break
+                } catch (e: Exception) {
+                    Log.w(TAG, "getDynamicSongs error: ${e.message}")
                 }
-            } catch (e: Exception) {
-                Log.w(TAG, "Native getDynamicSongs error: ${e.message}")
             }
-        }
 
-        // 2. Dynamic query fallback from authenticated sleepok REST API client
-        if (result.size < limit) {
-            try {
-                val restSongs = sleepokClient.searchSongs("")
-                val shuffled = restSongs.shuffled()
-                for (s in shuffled) {
-                    if (s.id !in excludeIds && result.none { it.id == s.id }) {
-                        result.add(s)
-                    }
-                    if (result.size >= limit) break
-                }
-            } catch (e: Exception) {
-                Log.w(TAG, "Sleepok REST getDynamicSongs error: ${e.message}")
-            }
+            result.shuffled()
         }
-
-        // Shuffle dynamically to break repetitive sequence
-        result.shuffled()
-    }
 
     /**
      * Real-time dynamic Flow of songs from Firestore.
-     * Emits live updates as new songs arrive in Firestore, continuously shuffling and refreshing.
      */
     fun observeDynamicSongsRealtime(limit: Int = 30): Flow<List<SongEntity>> = callbackFlow {
         val db = firestore
@@ -192,7 +171,7 @@ class FirestoreMusicRepository(
     }
 
     /**
-     * Updates playback statistics in Firestore dynamically, shifting ranking
+     * Updates playback statistics in Firestore
      */
     suspend fun recordSongActivity(song: SongEntity) = withContext(Dispatchers.IO) {
         val db = firestore

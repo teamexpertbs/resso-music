@@ -27,8 +27,6 @@ class FirebaseMusicManager(private val context: Context) {
         private const val KEY_DEVICE_ID = "firebase_device_uuid"
     }
 
-    private val sleepokClient = SleepokFirestoreClient()
-
     private val deviceId: String by lazy {
         resolveDeviceId()
     }
@@ -76,7 +74,7 @@ class FirebaseMusicManager(private val context: Context) {
     fun getActiveDeviceId(): String = deviceId
 
     /**
-     * Immediately registers this device in sleepok Firestore so it is visible in console
+     * Register this device in Firestore for the resso-music project
      */
     fun registerDeviceInFirestore() {
         val model = android.os.Build.MODEL ?: "Android Device"
@@ -85,10 +83,6 @@ class FirebaseMusicManager(private val context: Context) {
         val devId = deviceId
 
         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-            // 1. Sleepok authenticated REST registration
-            sleepokClient.registerDevice(devId, model, manufacturer, androidVer)
-
-            // 2. Native Firestore registration if active
             val db = firestore
             if (db != null) {
                 try {
@@ -103,19 +97,18 @@ class FirebaseMusicManager(private val context: Context) {
                         "lastActive" to System.currentTimeMillis()
                     )
                     db.collection("devices").document(devId).set(deviceData, SetOptions.merge()).await()
-                    db.collection("users").document(devId).set(
-                        hashMapOf("deviceId" to devId, "lastActive" to System.currentTimeMillis()),
-                        SetOptions.merge()
-                    ).await()
+                    Log.i(TAG, "Device $devId registered in Firestore")
                 } catch (e: Exception) {
-                    Log.w(TAG, "Native device registration: ${e.message}")
+                    Log.w(TAG, "Device registration error: ${e.message}")
                 }
+            } else {
+                Log.w(TAG, "Firestore not available for device registration")
             }
         }
     }
 
     /**
-     * Ultra-fast asynchronous cloud sync for liked songs per device
+     * Sync liked song to Firestore
      */
     suspend fun syncLikedSong(song: SongEntity, isLiked: Boolean) = withContext(Dispatchers.IO) {
         val db = firestore
@@ -146,21 +139,16 @@ class FirebaseMusicManager(private val context: Context) {
                     docRef.delete().await()
                 }
             } catch (e: Exception) {
-                Log.w(TAG, "Native syncLikedSong: ${e.message}")
+                Log.w(TAG, "syncLikedSong error: ${e.message}")
             }
         }
-        // Direct authenticated sync with sleepok project
-        sleepokClient.syncLikedSong(deviceId, song, isLiked)
     }
 
     /**
-     * Restore cloud-synced liked songs for this device
+     * Fetch cloud-synced liked songs for this device
      */
     suspend fun fetchCloudLikedSongs(): List<SongEntity> = withContext(Dispatchers.IO) {
         val results = mutableListOf<SongEntity>()
-        val sleepokLikes = sleepokClient.fetchLikedSongs(deviceId)
-        results.addAll(sleepokLikes)
-
         val db = firestore
         if (db != null) {
             try {
@@ -190,9 +178,7 @@ class FirebaseMusicManager(private val context: Context) {
                         isLiked = true
                     )
                 }
-                for (s in fromDb) {
-                    if (results.none { it.id == s.id }) results.add(s)
-                }
+                results.addAll(fromDb)
             } catch (e: Exception) {
                 Log.w(TAG, "fetchCloudLikedSongs error: ${e.message}")
             }
@@ -201,7 +187,7 @@ class FirebaseMusicManager(private val context: Context) {
     }
 
     /**
-     * Cloud sync for custom playlists per device
+     * Sync playlists to Firestore
      */
     suspend fun syncPlaylist(playlist: PlaylistEntity) = withContext(Dispatchers.IO) {
         val db = firestore ?: return@withContext
@@ -225,7 +211,7 @@ class FirebaseMusicManager(private val context: Context) {
     }
 
     /**
-     * Cloud sync for custom song vibes
+     * Sync vibes to Firestore
      */
     suspend fun syncVibe(vibe: VibeEntity) = withContext(Dispatchers.IO) {
         val db = firestore ?: return@withContext
@@ -250,7 +236,7 @@ class FirebaseMusicManager(private val context: Context) {
     }
 
     /**
-     * Cloud sync for comments
+     * Sync comments to Firestore
      */
     suspend fun syncComment(comment: CommentEntity) = withContext(Dispatchers.IO) {
         val db = firestore ?: return@withContext
@@ -277,7 +263,7 @@ class FirebaseMusicManager(private val context: Context) {
     }
 
     /**
-     * Cloud sync for playback history
+     * Sync playback history to Firestore
      */
     suspend fun syncHistory(song: SongEntity) = withContext(Dispatchers.IO) {
         val db = firestore ?: return@withContext
@@ -300,7 +286,7 @@ class FirebaseMusicManager(private val context: Context) {
     }
 
     /**
-     * Index song metadata into Firestore 'songs' collection for live global search
+     * Index song metadata into Firestore 'songs' collection for app-wide search
      */
     suspend fun indexSongMetadata(song: SongEntity) = withContext(Dispatchers.IO) {
         if (!song.audioUrl.startsWith("http")) return@withContext
@@ -334,8 +320,6 @@ class FirebaseMusicManager(private val context: Context) {
                 Log.w(TAG, "indexSongMetadata error: ${e.message}")
             }
         }
-        // Direct indexing into sleepok project
-        sleepokClient.indexSong(song)
     }
 
     suspend fun indexSongsMetadata(songs: List<SongEntity>) = withContext(Dispatchers.IO) {
@@ -344,7 +328,6 @@ class FirebaseMusicManager(private val context: Context) {
 
     /**
      * Real-time search query on Firestore 'songs' collection
-     * Listens to live Firestore updates as user types!
      */
     fun searchSongsInFirestoreRealtime(query: String): Flow<List<SongEntity>> = callbackFlow {
         val cleanQuery = query.trim().lowercase()
@@ -352,14 +335,6 @@ class FirebaseMusicManager(private val context: Context) {
             trySend(emptyList())
             close()
             return@callbackFlow
-        }
-
-        // 1. Immediate fetch from sleepok project using Service Account credentials
-        val immediateJob = launch(Dispatchers.IO) {
-            val sleepokSongs = sleepokClient.searchSongs(cleanQuery)
-            if (sleepokSongs.isNotEmpty()) {
-                trySend(sleepokSongs)
-            }
         }
 
         val db = firestore
@@ -416,7 +391,6 @@ class FirebaseMusicManager(private val context: Context) {
         }
 
         awaitClose {
-            immediateJob.cancel()
             listener?.remove()
         }
     }
