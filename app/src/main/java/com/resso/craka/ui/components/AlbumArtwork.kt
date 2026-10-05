@@ -67,7 +67,7 @@ fun AlbumArtwork(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(url)
                     .crossfade(180)
-                    .allowHardware(false)
+                    .allowHardware(true)
                     .diskCachePolicy(CachePolicy.ENABLED)
                     .memoryCachePolicy(CachePolicy.ENABLED)
                     .networkCachePolicy(CachePolicy.ENABLED)

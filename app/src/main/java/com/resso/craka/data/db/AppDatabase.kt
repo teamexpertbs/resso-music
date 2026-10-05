@@ -15,11 +15,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface SongDao {
-    @Query("SELECT * FROM songs ORDER BY createdAt ASC")
+    @Query("SELECT * FROM songs WHERE audioUrl LIKE 'http%' ORDER BY createdAt ASC")
     fun getAllSongs(): Flow<List<SongEntity>>
 
-    @Query("SELECT * FROM songs WHERE isLiked = 1 ORDER BY createdAt DESC")
+    @Query("SELECT * FROM songs WHERE isLiked = 1 AND audioUrl LIKE 'http%' ORDER BY createdAt DESC")
     fun getLikedSongs(): Flow<List<SongEntity>>
+
+    @Query("DELETE FROM songs WHERE id LIKE 'local_%'")
+    suspend fun purgeLocalSongs()
 
     @Query("SELECT * FROM songs WHERE id = :id LIMIT 1")
     suspend fun getSongById(id: String): SongEntity?
@@ -57,6 +60,9 @@ interface SongDao {
 
     @Query("SELECT * FROM songs WHERE title LIKE '%' || :query || '%' OR artist LIKE '%' || :query || '%' OR genre LIKE '%' || :query || '%'")
     suspend fun searchLocalSongs(query: String): List<SongEntity>
+
+    @Query("SELECT * FROM songs WHERE audioUrl LIKE 'http%' LIMIT 50")
+    suspend fun getInitialSongsSync(): List<SongEntity>
 }
 
 @Dao

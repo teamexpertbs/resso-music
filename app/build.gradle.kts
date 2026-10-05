@@ -14,7 +14,7 @@ android {
   compileSdk = 36
 
   defaultConfig {
-    applicationId = "com.resso.craka"
+    applicationId = "com.aistudio.ressomusic.kptzq"
     minSdk = 24
     targetSdk = 36
     versionCode = 1
@@ -123,8 +123,8 @@ dependencies {
   implementation("androidx.media:media:1.7.0")
   implementation(libs.converter.moshi)
   implementation(libs.firebase.ai)
-  // Uncomment to use Firestore:
-  // implementation(libs.firebase.firestore)
+  // Firebase Firestore cloud database
+  implementation(libs.firebase.firestore)
 
   // Uncomment ALL FOUR of the following dependencies together to use Firebase Auth and Google
   // Sign-In via Credential Manager:

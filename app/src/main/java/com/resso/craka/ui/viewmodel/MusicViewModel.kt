@@ -13,6 +13,9 @@ import androidx.media3.common.AudioAttributes
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import android.media.audiofx.LoudnessEnhancer
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.audio.DefaultAudioSink
@@ -66,7 +69,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     .build()
             }
         }
+        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
+            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .setAllowCrossProtocolRedirects(true)
+            .setConnectTimeoutMs(15000)
+            .setReadTimeoutMs(15000)
+        val dataSourceFactory = DefaultDataSource.Factory(application, httpDataSourceFactory)
+        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+
         ExoPlayer.Builder(application, renderersFactory)
+            .setMediaSourceFactory(mediaSourceFactory)
             .setAudioAttributes(
                 AudioAttributes.Builder()
                     .setContentType(C.AUDIO_CONTENT_TYPE_MUSIC)
@@ -107,7 +119,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val openPlaylistSongs: StateFlow<List<SongEntity>> = _openPlaylistSongs.asStateFlow()
 
     private val playerPrefs = application.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
-    private val playedHistoryIds = java.util.Collections.synchronizedSet(LinkedHashSet<String>())
+    private val playedHistoryIds = java.util.Collections.synchronizedSet(
+        LinkedHashSet(playerPrefs.getStringSet("played_history_ids", emptySet()) ?: emptySet())
+    )
+    private val playbackBackStack = java.util.ArrayDeque<SongEntity>()
+    private val playbackForwardStack = java.util.ArrayDeque<SongEntity>()
+    private var isNavigatingHistory = false
 
     private val _currentPositionMs = MutableStateFlow(0L)
     val currentPositionMs: StateFlow<Long> = _currentPositionMs.asStateFlow()
@@ -190,6 +207,44 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val _searchResults = MutableStateFlow<List<SongEntity>>(emptyList())
     val searchResults: StateFlow<List<SongEntity>> = _searchResults.asStateFlow()
 
+    private val _firestoreSearchResults = MutableStateFlow<List<SongEntity>>(emptyList())
+    val firestoreSearchResults: StateFlow<List<SongEntity>> = _firestoreSearchResults.asStateFlow()
+
+    private val _isFirestoreSearching = MutableStateFlow(false)
+    val isFirestoreSearching: StateFlow<Boolean> = _isFirestoreSearching.asStateFlow()
+
+    private var firestoreSearchJob: Job? = null
+    private var activeSearchRequestId: Long = 0L
+
+    private val _searchFilterType = MutableStateFlow(com.resso.craka.ui.components.SearchFilterType.ALL)
+    val searchFilterType: StateFlow<com.resso.craka.ui.components.SearchFilterType> = _searchFilterType.asStateFlow()
+
+    fun setSearchFilterType(type: com.resso.craka.ui.components.SearchFilterType) {
+        _searchFilterType.value = type
+    }
+
+    fun searchFirestoreRealtime(query: String) {
+        firestoreSearchJob?.cancel()
+        val trimmed = query.trim()
+        if (trimmed.isEmpty()) {
+            _firestoreSearchResults.value = emptyList()
+            _isFirestoreSearching.value = false
+            return
+        }
+        firestoreSearchJob = viewModelScope.launch {
+            try {
+                repository.searchSongsInFirestoreRealtime(trimmed).collect { list ->
+                    _firestoreSearchResults.value = list
+                    _isFirestoreSearching.value = false
+                }
+            } catch (_: Throwable) {
+                // Graceful fallback if Cloud Firestore API is disabled or permissions not granted
+                _firestoreSearchResults.value = emptyList()
+                _isFirestoreSearching.value = false
+            }
+        }
+    }
+
     private val _isSearching = MutableStateFlow(false)
     val isSearching: StateFlow<Boolean> = _isSearching.asStateFlow()
 
@@ -241,6 +296,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private var crossfadeTriggeredForCurrentSong = false
 
     private val appEqualizer = AppEqualizer()
+    private val shuffleEngine = com.resso.craka.player.PlaybackShuffleEngine()
     private var sleepJob: Job? = null
 
     private var searchJob: Job? = null
@@ -320,6 +376,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
+    private fun isUsingStreamPlayer(song: SongEntity?): Boolean {
+        if (song == null) return false
+        return song.audioUrl.isBlank() && song.id.startsWith("yt_")
+    }
+
     private fun setupStreamListener() {
         streamPlayerManager.onVideoEnded = {
             handleSongEnded()
@@ -328,7 +389,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             streamPlayerManager.isPlaying.collect { streamPlaying ->
                 val song = _currentSong.value
-                if (song != null && song.id.startsWith("yt_")) {
+                if (isUsingStreamPlayer(song)) {
                     if (streamPlaying || !streamPlayerManager.wantsBackgroundPlayback()) {
                         _isPlaying.value = streamPlaying
                         publishPlayback(streamPlaying)
@@ -345,7 +406,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             streamPlayerManager.currentTimeMs.collect { streamPos ->
                 val song = _currentSong.value
-                if (song != null && song.id.startsWith("yt_")) {
+                if (isUsingStreamPlayer(song)) {
                     _currentPositionMs.value = streamPos
                     val currentLyrics = _lyrics.value
                     if (currentLyrics.isNotEmpty()) {
@@ -366,7 +427,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch {
             streamPlayerManager.durationMs.collect { streamDur ->
                 val song = _currentSong.value
-                if (song != null && song.id.startsWith("yt_") && streamDur > 1000L) {
+                if (isUsingStreamPlayer(song) && streamDur > 1000L) {
                     _durationMs.value = streamDur
                 }
             }
@@ -384,7 +445,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun restartCurrentSong() {
         seekTo(0)
         val song = _currentSong.value ?: return
-        if (song.id.startsWith("yt_")) {
+        if (isUsingStreamPlayer(song)) {
             streamPlayerManager.play()
         } else {
             player.play()
@@ -400,27 +461,37 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         return _trendingSongs.value
     }
 
-        private fun loadTrendingSongs() {
-        val cached = repository.peekTrending()
-        if (cached.isNotEmpty()) {
-            _trendingSongs.value = cached
-            if (playbackQueue.value.isEmpty()) playbackQueue.value = cached
-            restoreLastPlaybackOrInitial(cached)
-        } else {
-            // Immediate restore from recent cache or saved prefs even before network responds!
-            restoreLastPlaybackOrInitial(emptyList())
-        }
-        viewModelScope.launch {
+    private fun loadTrendingSongs() {
+        viewModelScope.launch(Dispatchers.IO) {
             try {
                 val trending = repository.getTrendingSongs()
-                if (trending.isEmpty()) return@launch
-                _trendingSongs.value = trending
-                if (playbackQueue.value.isEmpty() || playbackQueue.value.map { it.id } == cached.map { it.id }) {
-                    playbackQueue.value = trending
+                if (trending.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        _trendingSongs.value = trending
+                        if (playbackQueue.value.isEmpty()) {
+                            val (shuffledQueue, _) = if (_isShuffle.value) {
+                                shuffleEngine.onNewSongsFetched(emptyList(), trending, null)
+                            } else {
+                                trending to 0
+                            }
+                            playbackQueue.value = shuffledQueue
+                            restoreLastPlaybackOrInitial(shuffledQueue)
+                        }
+                    }
+                } else {
+                    withContext(Dispatchers.Main) {
+                        if (playbackQueue.value.isEmpty()) {
+                            restoreLastPlaybackOrInitial(emptyList())
+                        }
+                    }
                 }
-                restoreLastPlaybackOrInitial(trending)
             } catch (e: Exception) {
                 Log.w("MusicViewModel", "Error loading trending: ${e.message}")
+                withContext(Dispatchers.Main) {
+                    if (playbackQueue.value.isEmpty()) {
+                        restoreLastPlaybackOrInitial(emptyList())
+                    }
+                }
             }
         }
     }
@@ -428,51 +499,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun restoreLastPlaybackOrInitial(trendingList: List<SongEntity>) {
         if (_currentSong.value != null) return
         viewModelScope.launch {
-            val lastId = playerPrefs.getString("last_played_song_id", null)
-            val lastPos = playerPrefs.getLong("last_position_ms", 0L)
+            val pool = (trendingList + _trendingSongs.value + allSongs.value).distinctBy { it.id }
+            if (pool.isEmpty()) return@launch
 
-            var songToSelect: SongEntity? = null
-            if (!lastId.isNullOrBlank()) {
-                songToSelect = repository.recentSongs().firstOrNull { it.id == lastId }
-                    ?: repository.getSongById(lastId)
-                    ?: run {
-                        val title = playerPrefs.getString("last_played_title", null)
-                        val url = playerPrefs.getString("last_played_url", null)
-                        if (!title.isNullOrBlank() && !url.isNullOrBlank()) {
-                            SongEntity(
-                                id = lastId,
-                                title = title,
-                                artist = playerPrefs.getString("last_played_artist", "Unknown") ?: "Unknown",
-                                album = playerPrefs.getString("last_played_album", "Single") ?: "Single",
-                                durationMs = playerPrefs.getLong("last_played_duration", 210000L),
-                                audioUrl = url,
-                                albumArtUrl = playerPrefs.getString("last_played_art", "") ?: "",
-                                lyricsLrc = "",
-                                vibeVideoUri = ""
-                            )
-                        } else null
-                    }
-            }
-            if (songToSelect == null && trendingList.isNotEmpty()) {
-                songToSelect = trendingList.shuffled().firstOrNull() ?: trendingList.firstOrNull()
-            }
-            if (songToSelect == null) {
-                songToSelect = repository.recentSongs().firstOrNull()
-                    ?: allSongs.value.shuffled().firstOrNull()
-                    ?: allSongs.value.firstOrNull()
-            }
+            // Always pick a brand new song that has not been heard yet in previous sessions!
+            val unplayed = pool.filter { it.id !in playedHistoryIds }
+            val songToSelect = unplayed.shuffled().firstOrNull()
+                ?: pool.shuffled().firstOrNull()
+                ?: pool.first()
 
-            val shouldSeek = (lastId == songToSelect?.id && lastPos > 0L)
-            songToSelect?.let { song ->
-                if (_currentSong.value == null) {
-                    val initialQueue = (listOf(song) + repository.recentSongs() + trendingList + allSongs.value).distinctBy { it.id }
-                    selectSong(song, 0, autoPlay = false, queue = initialQueue)
-                    if (shouldSeek) {
-                        delay(300)
-                        seekTo(lastPos)
-                    }
-                    ensureAutoplayRadioBuffer(song)
-                }
+            if (_currentSong.value == null) {
+                val randomizedQueue = (listOf(songToSelect) + pool.filter { it.id != songToSelect.id }.shuffled()).distinctBy { it.id }
+                selectSong(songToSelect, 0, autoPlay = false, queue = randomizedQueue)
+                ensureAutoplayRadioBuffer(songToSelect)
             }
         }
     }
@@ -484,33 +523,47 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun searchMusic(query: String) {
-        searchJob?.cancel()
         val trimmed = query.trim()
         if (trimmed.isEmpty()) {
+            searchJob?.cancel()
             _searchResults.value = emptyList()
             _isSearching.value = false
             _searchError.value = null
             return
         }
 
+        searchJob?.cancel()
+        val requestId = ++activeSearchRequestId
+
         searchJob = viewModelScope.launch {
             _isSearching.value = true
             _searchError.value = null
+
+            // 1. Immediately display local matching songs without waiting for network
+            val localMatches = repository.searchLocalSongs(trimmed).filter { it.audioUrl.startsWith("http") }
+            if (localMatches.isNotEmpty() && requestId == activeSearchRequestId) {
+                _searchResults.value = localMatches
+            }
+
+            // 2. Query online music catalog off the main thread
             try {
-                // 1. Gather matching local songs
-                val localMatches = repository.searchLocalSongs(trimmed)
+                val onlineMatches = withContext(Dispatchers.IO) {
+                    repository.searchSongsOnline(trimmed).filter { it.audioUrl.startsWith("http") }
+                }
 
-                // 2. Search JioSaavn / 320kbps Online songs
-                val onlineMatches = repository.searchSongsOnline(trimmed)
+                // Check if this response is still the latest active search
+                if (requestId != activeSearchRequestId || !isActive) return@launch
 
-                // 3. Combine without duplicate entries
                 val combined = mutableListOf<SongEntity>()
-                combined.addAll(localMatches)
-                val existingKeys = localMatches.map { "${it.title.lowercase()}_${it.artist.lowercase()}" }.toSet()
+                val seenIds = mutableSetOf<String>()
 
                 for (song in onlineMatches) {
-                    val key = "${song.title.lowercase()}_${song.artist.lowercase()}"
-                    if (key !in existingKeys && combined.none { it.id == song.id }) {
+                    if (seenIds.add(song.id)) {
+                        combined.add(song)
+                    }
+                }
+                for (song in localMatches) {
+                    if (seenIds.add(song.id)) {
                         combined.add(song)
                     }
                 }
@@ -519,14 +572,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (combined.isNotEmpty()) {
                     rememberSearch(trimmed)
                     _homeRows.value = buildHomeRows(allSongs.value)
-                }
-                if (combined.isEmpty()) {
+                } else {
                     _searchError.value = "No songs found for '$trimmed'"
                 }
             } catch (e: Exception) {
-                _searchError.value = "Search error: ${e.localizedMessage ?: "Unknown error"}"
+                if (requestId == activeSearchRequestId) {
+                    if (_searchResults.value.isEmpty()) {
+                        _searchError.value = "Unable to load songs for '$trimmed'. Please check connection and retry."
+                    }
+                }
             } finally {
-                _isSearching.value = false
+                if (requestId == activeSearchRequestId) {
+                    _isSearching.value = false
+                }
             }
         }
     }
@@ -603,7 +661,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
             override fun onIsPlayingChanged(playing: Boolean) {
                 val song = _currentSong.value
-                if (song != null && !song.id.startsWith("yt_")) {
+                if (!isUsingStreamPlayer(song)) {
                     _isPlaying.value = playing
                     if (playing && _isFlashSyncEnabled.value) {
                         flashSyncManager.startDirectSync()
@@ -612,12 +670,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                         beatDetectionAudioProcessor.isEnabled = false
                         flashSyncManager.stopSync()
                     }
+                    publishPlayback(playing)
                 }
             }
 
             override fun onPlaybackStateChanged(state: Int) {
                 val song = _currentSong.value
-                if (song != null && !song.id.startsWith("yt_")) {
+                if (!isUsingStreamPlayer(song)) {
                     if (state == Player.STATE_READY) {
                         _durationMs.value = player.duration.coerceAtLeast(1L)
                         applyEqualizer()
@@ -625,6 +684,42 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     } else if (state == Player.STATE_ENDED) {
                         handleSongEnded()
                     }
+                }
+            }
+
+            override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+                Log.e("MusicViewModel", "ExoPlayer playback error: ${error.errorCodeName} - ${error.message}", error)
+                val current = _currentSong.value
+                val audioUrl = current?.audioUrl.orEmpty()
+
+                // Automatic bitrate fallback for 404 / HTTP errors (try 160kbps, then 96kbps)
+                if (audioUrl.contains("_320.mp4")) {
+                    val fallback160 = audioUrl.replace("_320.mp4", "_160.mp4")
+                    _currentSong.value = current?.copy(audioUrl = fallback160)
+                    try {
+                        player.setMediaItem(MediaItem.fromUri(mediaUri(fallback160)))
+                        player.prepare()
+                        player.play()
+                        _isPlaying.value = true
+                        return
+                    } catch (_: Exception) {}
+                } else if (audioUrl.contains("_160.mp4")) {
+                    val fallback96 = audioUrl.replace("_160.mp4", "_96.mp4")
+                    _currentSong.value = current?.copy(audioUrl = fallback96)
+                    try {
+                        player.setMediaItem(MediaItem.fromUri(mediaUri(fallback96)))
+                        player.prepare()
+                        player.play()
+                        _isPlaying.value = true
+                        return
+                    } catch (_: Exception) {}
+                }
+
+                // If fallback not applicable or failed, smoothly skip to next track without crashing
+                _isPlaying.value = false
+                viewModelScope.launch {
+                    delay(300)
+                    playNextSong()
                 }
             }
         })
@@ -635,7 +730,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         progressJob = viewModelScope.launch {
             while (isActive) {
                 val song = _currentSong.value
-                if (song != null && !song.id.startsWith("yt_") && player.isPlaying) {
+                if (!isUsingStreamPlayer(song) && player.isPlaying) {
                     val pos = player.currentPosition
                     _currentPositionMs.value = pos
                     val dur = player.duration
@@ -665,23 +760,47 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         autoPlay: Boolean = true,
         queue: List<SongEntity>? = null
     ) {
-        if (!queue.isNullOrEmpty()) {
-            playbackQueue.value = queue
-        } else if (playbackQueue.value.none { it.id == song.id }) {
-            val fallback = (_trendingSongs.value + allSongs.value).filter { it.id != song.id }
-            playbackQueue.value = listOf(song) + fallback
+        val currentQueue = playbackQueue.value
+        val effectiveQueue = when {
+            queue != null && queue.isNotEmpty() -> queue
+            currentQueue.any { it.id == song.id } -> currentQueue
+            currentQueue.isNotEmpty() -> listOf(song) + currentQueue
+            else -> listOf(song) + (_trendingSongs.value + allSongs.value).filter { it.id != song.id }
+        }.distinctBy { it.id }
+
+        playbackQueue.value = effectiveQueue
+
+        if (!isNavigatingHistory) {
+            // User manually selected a new song or tapped a track:
+            // Clear forward stack because user initiated a new branch of playback
+            synchronized(playbackForwardStack) {
+                playbackForwardStack.clear()
+            }
+            val prev = _currentSong.value
+            if (prev != null && prev.id != song.id) {
+                synchronized(playbackBackStack) {
+                    if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != prev.id) {
+                        playbackBackStack.addLast(prev)
+                        if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
+                    }
+                }
+            }
         }
+
         _currentSong.value = song
-        _currentSongIndex.value = index
+        _currentSongIndex.value = effectiveQueue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
         crossfadeTriggeredForCurrentSong = false
 
-        // Anti-repeat session memory (never repeats in current session)
+        // Anti-repeat session memory (never repeats in current or future sessions)
         synchronized(playedHistoryIds) {
             playedHistoryIds.add(song.id)
             if (playedHistoryIds.size > 250) {
                 val toRemove = playedHistoryIds.take(50).toSet()
                 playedHistoryIds.removeAll(toRemove)
             }
+            playerPrefs.edit()
+                .putStringSet("played_history_ids", java.util.HashSet(playedHistoryIds))
+                .apply()
         }
 
         // Persist recent & last played so app launch restores exact song & artwork
@@ -723,18 +842,30 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         observeCommentsForSong(song.id)
 
         _isVideoMode.value = false
-        try {
-            val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
-            player.setMediaItem(mediaItem)
-            player.prepare()
-            if (autoPlay) {
-                player.play()
-                _isPlaying.value = true
-            } else {
-                _isPlaying.value = false
+        if (isUsingStreamPlayer(song)) {
+            try { player.pause() } catch (_: Exception) {}
+            _streamVisible.value = true
+            streamPlayerManager.loadAndPlay(song.id.removePrefix("yt_"), autoPlay)
+            _isPlaying.value = autoPlay
+        } else {
+            try {
+                streamPlayerManager.pause()
+                streamPlayerManager.setKeepPlayingInBackground(false)
+            } catch (_: Exception) {}
+            _streamVisible.value = false
+            try {
+                val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
+                player.setMediaItem(mediaItem)
+                player.prepare()
+                if (autoPlay) {
+                    player.play()
+                    _isPlaying.value = true
+                } else {
+                    _isPlaying.value = false
+                }
+            } catch (e: Exception) {
+                Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
             }
-        } catch (e: Exception) {
-            Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
         }
 
         if (needsRealLyrics(song.lyricsLrc)) {
@@ -757,7 +888,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun publishPlayback(playing: Boolean = _isPlaying.value) {
         val song = _currentSong.value ?: return
-        if (playing && song.id.startsWith("yt_")) {
+        if (playing && isUsingStreamPlayer(song)) {
             streamPlayerManager.setKeepPlayingInBackground(true)
         }
         PlaybackService.update(
@@ -774,9 +905,15 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun resumePlayback() {
         val song = _currentSong.value ?: return
-        if (!player.isPlaying) {
-            player.play()
+        if (isUsingStreamPlayer(song)) {
+            streamPlayerManager.setKeepPlayingInBackground(true)
+            streamPlayerManager.play()
             _isPlaying.value = true
+        } else {
+            if (!player.isPlaying) {
+                player.play()
+                _isPlaying.value = true
+            }
         }
         publishPlayback(true)
     }
@@ -784,7 +921,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun pausePlayback() {
         val song = _currentSong.value ?: return
         wasPlayingBeforeNetworkLost = false
-        if (song.id.startsWith("yt_")) {
+        if (isUsingStreamPlayer(song)) {
             streamPlayerManager.setKeepPlayingInBackground(false)
             streamPlayerManager.pause()
         } else {
@@ -809,7 +946,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun togglePlayPause() {
         val song = _currentSong.value ?: return
-        if (song.id.startsWith("yt_")) {
+        if (isUsingStreamPlayer(song)) {
             val playing = _isPlaying.value || streamPlayerManager.isPlaying.value
             if (playing) pausePlayback() else resumePlayback()
             return
@@ -832,169 +969,193 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playNextSong() {
-        val songs = currentQueue()
-        if (songs.isEmpty()) {
-            viewModelScope.launch {
-                val freshTrending = repository.getTrendingSongs()
-                val candidate = freshTrending.firstOrNull { it.id !in playedHistoryIds } ?: freshTrending.firstOrNull()
-                if (candidate != null) {
-                    selectSong(candidate, 0, autoPlay = true, queue = freshTrending)
-                    ensureAutoplayRadioBuffer(candidate)
-                }
-            }
-            return
-        }
+        val queue = playbackQueue.value
+        if (queue.isEmpty()) return
 
-        val currentId = _currentSong.value?.id
-        val currentIndex = songs.indexOfFirst { it.id == currentId }.let { found ->
-            if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
-        }
-
-        // 1. If shuffle is enabled, pick unplayed random
-        if (_isShuffle.value) {
-            val unplayed = songs.filter { it.id != currentId && it.id !in playedHistoryIds }
-            val nextShuffle = unplayed.randomOrNull() ?: songs.filter { it.id != currentId }.randomOrNull()
-            if (nextShuffle != null) {
-                val newIndex = songs.indexOfFirst { it.id == nextShuffle.id }
-                selectSong(nextShuffle, newIndex, autoPlay = true, queue = songs)
-                ensureAutoplayRadioBuffer(nextShuffle)
-                return
-            }
-        }
-
-        // 2. Find next unplayed song in current queue after currentIndex
-        var nextSong: SongEntity? = null
-        var nextIndex = -1
-
-        for (i in (currentIndex + 1) until songs.size) {
-            val s = songs[i]
-            if (s.id !in playedHistoryIds && s.id != currentId) {
-                nextSong = s
-                nextIndex = i
-                break
-            }
-        }
-
-        // If no unplayed song after, check before currentIndex
-        if (nextSong == null) {
-            for (i in 0 until currentIndex) {
-                val s = songs[i]
-                if (s.id !in playedHistoryIds && s.id != currentId) {
-                    nextSong = s
-                    nextIndex = i
-                    break
-                }
-            }
-        }
-
-        // 3. Play found unplayed track from existing queue
-        if (nextSong != null && nextIndex >= 0) {
-            selectSong(nextSong, nextIndex, autoPlay = true, queue = songs)
-            ensureAutoplayRadioBuffer(nextSong)
-            return
-        }
-
-        // 4. Queue finished or single song: FETCH FRESH LIVE 320KBPS RADIO DIRECTLY FROM VERCEL / JIOSAAVN API!
-        // Never loop or replay previous song!
         val currentSong = _currentSong.value
-        viewModelScope.launch {
-            val newTracks = mutableListOf<SongEntity>()
 
-            // A. Live artist hits
-            if (currentSong != null) {
-                val cleanArtist = currentSong.artist
-                    .replace(Regex("(?i)ft\\.?|feat\\.?|&|,|official|audio|video|vevo|remix|mix"), " ")
-                    .trim()
-                if (cleanArtist.isNotBlank() && cleanArtist.length >= 3 && !cleanArtist.contains("unknown", ignoreCase = true)) {
-                    try {
-                        val artistTracks = repository.searchSongsOnline("$cleanArtist hits")
-                        for (track in artistTracks) {
-                            if (track.id !in playedHistoryIds && track.id != currentId && songs.none { it.id == track.id }) {
-                                newTracks.add(track)
-                            }
+        // 1. Check forward navigation history first (e.g. user pressed Previous earlier)
+        val forwardSong = synchronized(playbackForwardStack) {
+            if (playbackForwardStack.isNotEmpty()) {
+                playbackForwardStack.removeLast()
+            } else {
+                null
+            }
+        }
+
+        if (forwardSong != null) {
+            isNavigatingHistory = true
+            try {
+                if (currentSong != null) {
+                    synchronized(playbackBackStack) {
+                        if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != currentSong.id) {
+                            playbackBackStack.addLast(currentSong)
+                            if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
                         }
-                    } catch (_: Exception) {}
+                    }
+                }
+                val targetIndex = queue.indexOfFirst { it.id == forwardSong.id }.let { if (it >= 0) it else 0 }
+                selectSong(forwardSong, targetIndex, autoPlay = true)
+                ensureAutoplayRadioBuffer(forwardSong)
+            } finally {
+                isNavigatingHistory = false
+            }
+            return
+        }
+
+        // 2. Compute candidate track based on current queue and mode
+        val currentId = currentSong?.id
+        val currentIndex = queue.indexOfFirst { it.id == currentId }
+
+        val candidate: SongEntity?
+        val targetIndex: Int
+
+        if (_isShuffle.value) {
+            // Shuffle mode: pick an unplayed track if available, or any other track
+            val unplayed = queue.filter { it.id != currentId && it.id !in playedHistoryIds }
+            val chosen = if (unplayed.isNotEmpty()) {
+                unplayed.random()
+            } else {
+                val others = queue.filter { it.id != currentId }
+                if (others.isNotEmpty()) others.random() else queue.firstOrNull()
+            }
+            candidate = chosen
+            targetIndex = if (candidate != null) queue.indexOfFirst { it.id == candidate.id }.coerceAtLeast(0) else 0
+        } else {
+            // Normal sequential mode: deterministic track progression
+            if (currentIndex >= 0 && currentIndex + 1 < queue.size) {
+                targetIndex = currentIndex + 1
+                candidate = queue[targetIndex]
+            } else if (_repeatMode.value == 1 && queue.isNotEmpty()) {
+                // Repeat All: wrap to beginning of queue
+                targetIndex = 0
+                candidate = queue[0]
+            } else {
+                // Repeat Off and at end of queue:
+                val trending = _trendingSongs.value
+                val existingIds = queue.map { it.id }.toSet()
+                val nextTrending = trending.firstOrNull { it.id !in existingIds }
+                if (nextTrending != null) {
+                    playbackQueue.value = queue + nextTrending
+                    targetIndex = queue.size
+                    candidate = nextTrending
+                } else if (queue.isNotEmpty() && _repeatMode.value != 0) {
+                    targetIndex = 0
+                    candidate = queue[0]
+                } else {
+                    targetIndex = 0
+                    candidate = null
                 }
             }
+        }
 
-            // B. Live dynamic mood/genre seeds
-            if (newTracks.isEmpty()) {
-                val seeds = listOf(
-                    "Trending Hindi Hits",
-                    "Top Punjabi Hits",
-                    "Bollywood Romantic Hits",
-                    "Superhit Bollywood Songs",
-                    "Arijit Singh Hits",
-                    "Latest Bollywood Songs",
-                    "Party Dance Hindi"
-                ).shuffled()
-                for (query in seeds) {
-                    try {
-                        val poolTracks = repository.searchSongsOnline(query)
-                        for (track in poolTracks) {
-                            if (track.id !in playedHistoryIds && track.id != currentId && songs.none { it.id == track.id }) {
-                                newTracks.add(track)
-                            }
-                        }
-                        if (newTracks.size >= 5) break
-                    } catch (_: Exception) {}
-                }
-            }
-
-            // C. Live trending fallback
-            if (newTracks.isEmpty()) {
+        // Proactive replenishment buffer if nearing end of queue
+        val unplayedRemaining = queue.count { it.id != currentId && it.id !in playedHistoryIds }
+        if (unplayedRemaining <= 3) {
+            viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val trending = repository.getTrendingSongs()
-                    for (track in trending) {
-                        if (track.id !in playedHistoryIds && track.id != currentId && songs.none { it.id == track.id }) {
-                            newTracks.add(track)
+                    val freshSongs = repository.getTrendingSongs()
+                    if (freshSongs.isNotEmpty()) {
+                        withContext(Dispatchers.Main) {
+                            val existingIds = playbackQueue.value.map { it.id }.toSet()
+                            val newTracks = freshSongs.filter { it.id !in existingIds }
+                            if (newTracks.isNotEmpty()) {
+                                playbackQueue.value = playbackQueue.value + newTracks
+                            }
                         }
                     }
                 } catch (_: Exception) {}
             }
+        }
 
-            val nextLiveSong = newTracks.firstOrNull()
-            if (nextLiveSong != null) {
-                val updatedQueue = (songs + newTracks).distinctBy { it.id }
-                playbackQueue.value = updatedQueue
-                val newIdx = updatedQueue.indexOfFirst { it.id == nextLiveSong.id }
-                selectSong(nextLiveSong, newIdx, autoPlay = true, queue = updatedQueue)
-                ensureAutoplayRadioBuffer(nextLiveSong)
-            } else {
-                // Fully offline fallback: pick any distinct song not played recently
-                val candidate = allSongs.value.firstOrNull { it.id != currentId && it.id !in playedHistoryIds }
-                    ?: allSongs.value.firstOrNull { it.id != currentId }
-                    ?: songs.firstOrNull { it.id != currentId }
-                if (candidate != null) {
-                    val newQueue = (songs + candidate).distinctBy { it.id }
-                    playbackQueue.value = newQueue
-                    val newIdx = newQueue.indexOfFirst { it.id == candidate.id }
-                    selectSong(candidate, newIdx, autoPlay = true, queue = newQueue)
+        if (candidate != null) {
+            if (currentSong != null) {
+                synchronized(playbackBackStack) {
+                    if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != currentSong.id) {
+                        playbackBackStack.addLast(currentSong)
+                        if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
+                    }
                 }
             }
+            selectSong(candidate, targetIndex, autoPlay = true)
+            ensureAutoplayRadioBuffer(candidate)
         }
     }
 
     fun playPreviousSong() {
-        val songs = currentQueue()
-        if (songs.isEmpty()) return
-        val currentIndex = songs.indexOfFirst { it.id == _currentSong.value?.id }.let { found ->
-            if (found >= 0) found else _currentSongIndex.value.coerceIn(0, songs.lastIndex)
+        val queue = playbackQueue.value
+        if (queue.isEmpty()) return
+
+        val currentSong = _currentSong.value
+
+        // 1. Pop from playbackBackStack first for real navigation back-stack
+        val previousSong = synchronized(playbackBackStack) {
+            if (playbackBackStack.isNotEmpty()) {
+                playbackBackStack.removeLast()
+            } else {
+                null
+            }
         }
-        val prevIndex = if (_currentPositionMs.value > 3000) {
-            currentIndex
-        } else if (currentIndex - 1 < 0) {
-            songs.lastIndex
-        } else {
+
+        if (previousSong != null) {
+            isNavigatingHistory = true
+            try {
+                // Push current song to forward stack so pressing Next returns to it!
+                if (currentSong != null) {
+                    synchronized(playbackForwardStack) {
+                        if (playbackForwardStack.isEmpty() || playbackForwardStack.peekLast()?.id != currentSong.id) {
+                            playbackForwardStack.addLast(currentSong)
+                            if (playbackForwardStack.size > 50) playbackForwardStack.removeFirst()
+                        }
+                    }
+                }
+                val targetIndex = queue.indexOfFirst { it.id == previousSong.id }.let { if (it >= 0) it else 0 }
+                selectSong(previousSong, targetIndex, autoPlay = true)
+                ensureAutoplayRadioBuffer(previousSong)
+            } finally {
+                isNavigatingHistory = false
+            }
+            return
+        }
+
+        // 2. If back stack is empty:
+        // If song played for more than 3 seconds, restart it from 0:00
+        if (_currentPositionMs.value > 3000L && currentSong != null) {
+            seekTo(0L)
+            if (!_isPlaying.value) togglePlayPause()
+            return
+        }
+
+        // Otherwise go to previous sequential track in queue
+        val currentId = currentSong?.id
+        val currentIndex = queue.indexOfFirst { it.id == currentId }
+
+        val fallbackIndex = if (currentIndex > 0) {
             currentIndex - 1
+        } else if (_repeatMode.value == 1 && queue.isNotEmpty()) {
+            queue.lastIndex
+        } else {
+            0
         }
-        selectSong(songs[prevIndex], prevIndex, autoPlay = true)
+
+        val fallbackCandidate = queue.getOrNull(fallbackIndex)
+        if (fallbackCandidate != null && fallbackCandidate.id != currentId) {
+            if (currentSong != null) {
+                synchronized(playbackForwardStack) {
+                    playbackForwardStack.addLast(currentSong)
+                }
+            }
+            selectSong(fallbackCandidate, fallbackIndex, autoPlay = true)
+            ensureAutoplayRadioBuffer(fallbackCandidate)
+        } else {
+            seekTo(0L)
+        }
     }
 
     fun seekTo(positionMs: Long) {
         _currentPositionMs.value = positionMs
         val song = _currentSong.value
-        if (song != null && song.id.startsWith("yt_")) {
+        if (isUsingStreamPlayer(song)) {
             streamPlayerManager.seekTo(positionMs)
         } else {
             player.seekTo(positionMs)
@@ -1003,8 +1164,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun toggleShuffle() {
-        _isShuffle.value = !_isShuffle.value
-        playerPrefs.edit().putBoolean("shuffle", _isShuffle.value).apply()
+        val next = !_isShuffle.value
+        _isShuffle.value = next
+        playerPrefs.edit().putBoolean("shuffle", next).apply()
+        synchronized(playbackForwardStack) {
+            playbackForwardStack.clear()
+        }
     }
 
     fun toggleRepeat() {
@@ -1069,9 +1234,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val newState = !_isFlashSyncEnabled.value
         _isFlashSyncEnabled.value = newState
         val song = _currentSong.value
-        val isYt = song == null || song.id.startsWith("yt_")
+        val isStream = isUsingStreamPlayer(song)
         if (newState && (_isPlaying.value || streamPlayerManager.isPlaying.value)) {
-            if (isYt) {
+            if (isStream) {
                 beatDetectionAudioProcessor.isEnabled = false
                 flashSyncManager.startFallbackRhythm()
                 _networkStatusMessage.value = "⚡ Flash Beat Sync: ON (Estimated rhythm pulse for stream)"
@@ -1351,7 +1516,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val song = _currentSong.value
-        if (song == null || song.id.startsWith("yt_")) {
+        if (song == null || isUsingStreamPlayer(song)) {
             appEqualizer.apply("Off")
             return
         }
@@ -1511,8 +1676,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
                 if (newTracks.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
-                        val updated = (playbackQueue.value + newTracks).distinctBy { it.id }
-                        playbackQueue.value = updated
+                        val currentQueue = playbackQueue.value
+                        val existingQueueIds = currentQueue.map { it.id }.toSet()
+                        val distinctNew = newTracks.filter { it.id !in existingQueueIds }
+                        if (distinctNew.isNotEmpty()) {
+                            playbackQueue.value = currentQueue + distinctNew
+                        }
                     }
                 }
             } catch (e: Exception) {

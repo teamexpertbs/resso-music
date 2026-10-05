@@ -69,6 +69,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.resso.craka.data.model.SongEntity
 import com.resso.craka.ui.components.AlbumArtwork
+import com.resso.craka.ui.components.FirestoreSearchBar
+import com.resso.craka.ui.components.SearchFilterType
 import com.resso.craka.ui.theme.RessoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoPrimary
@@ -89,6 +91,8 @@ fun ExploreScreen(
 ) {
     val allSongs by viewModel.allSongs.collectAsState()
     val searchResults by viewModel.searchResults.collectAsState()
+    val firestoreSearchResults by viewModel.firestoreSearchResults.collectAsState()
+    val isFirestoreSearching by viewModel.isFirestoreSearching.collectAsState()
     val isSearching by viewModel.isSearching.collectAsState()
     val searchError by viewModel.searchError.collectAsState()
     val trendingSongs by viewModel.trendingSongs.collectAsState()
@@ -97,6 +101,7 @@ fun ExploreScreen(
     val pendingSearch by viewModel.pendingSearch.collectAsState()
     val homeRows by viewModel.homeRows.collectAsState()
     val recentSongs by viewModel.recentSongs.collectAsState()
+    val filterType by viewModel.searchFilterType.collectAsState()
 
     var searchKeyword by remember { mutableStateOf("") }
     var selectedMood by remember { mutableStateOf<String?>(null) }
@@ -121,17 +126,37 @@ fun ExploreScreen(
 
     LaunchedEffect(searchKeyword) {
         if (searchKeyword.isNotBlank()) {
-            delay(280) // Fast 280ms typing debounce for snappy real-time results
+            delay(280) // Smooth typing debounce
             viewModel.searchMusic(searchKeyword)
         } else {
             viewModel.searchMusic("") // Instant clear
         }
     }
 
-    // Determine songs to show
-    val displaySongs = remember(searchKeyword, searchResults, trendingSongs, allSongs, selectedMood) {
+    // Determine songs to show - merges online catalog & local results and applies explicit filter chip if selected
+    val displaySongs = remember(searchKeyword, searchResults, firestoreSearchResults, trendingSongs, allSongs, selectedMood, filterType) {
         val baseList = if (searchKeyword.isNotBlank()) {
-            searchResults
+            val merged = mutableListOf<SongEntity>()
+            val seen = mutableSetOf<String>()
+            for (song in searchResults) {
+                if (seen.add(song.id)) merged.add(song)
+            }
+            for (song in firestoreSearchResults) {
+                if (seen.add(song.id)) merged.add(song)
+            }
+
+            // Apply Material3 Title / Artist Filter ONLY if user explicitly changed filter chips
+            when (filterType) {
+                SearchFilterType.ALL -> merged
+                SearchFilterType.TITLE -> {
+                    val clean = searchKeyword.trim().lowercase()
+                    merged.filter { it.title.lowercase().contains(clean) }
+                }
+                SearchFilterType.ARTIST -> {
+                    val clean = searchKeyword.trim().lowercase()
+                    merged.filter { it.artist.lowercase().contains(clean) }
+                }
+            }
         } else if (trendingSongs.isNotEmpty()) {
             trendingSongs
         } else {
@@ -206,49 +231,65 @@ fun ExploreScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Search Bar with IME search
-        OutlinedTextField(
-            value = searchKeyword,
-            onValueChange = { searchKeyword = it },
-            placeholder = { Text("Search songs, artists, or lyrics...", color = RessoTextSecondary, fontSize = 13.sp) },
-            leadingIcon = {
-                Icon(imageVector = Icons.Default.Search, contentDescription = "Search", tint = RessoPrimary)
-            },
-            trailingIcon = {
-                if (searchKeyword.isNotEmpty()) {
-                    IconButton(
-                        onClick = {
-                            searchKeyword = ""
-                            focusManager.clearFocus()
-                        }
-                    ) {
-                        Icon(imageVector = Icons.Default.Clear, contentDescription = "Clear", tint = RessoTextSecondary)
-                    }
+        // Material 3 Firestore Search Bar with Title/Artist Filter Chips
+        FirestoreSearchBar(
+            query = searchKeyword,
+            onQueryChange = { searchKeyword = it },
+            filterType = filterType,
+            onFilterTypeChange = { viewModel.setSearchFilterType(it) },
+            isSearching = isSearching || isFirestoreSearching,
+            onSearchTriggered = {
+                focusManager.clearFocus()
+                if (it.isNotBlank()) {
+                    viewModel.searchMusic(it)
                 }
             },
-            singleLine = true,
-            shape = RoundedCornerShape(16.dp),
-            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-            keyboardActions = KeyboardActions(
-                onSearch = {
-                    focusManager.clearFocus()
-                    if (searchKeyword.isNotBlank()) {
-                        viewModel.searchMusic(searchKeyword)
-                    }
-                }
-            ),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedContainerColor = RessoSurface,
-                unfocusedContainerColor = RessoSurface,
-                focusedBorderColor = RessoPrimary,
-                unfocusedBorderColor = Color.Transparent,
-                focusedTextColor = Color.White,
-                unfocusedTextColor = Color.White
-            ),
+            onClearQuery = {
+                searchKeyword = ""
+                focusManager.clearFocus()
+            },
             modifier = Modifier
                 .fillMaxWidth()
-                .testTag("explore_search_input")
+                .padding(vertical = 4.dp)
         )
+
+        if (searchKeyword.isNotBlank()) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 6.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .clip(CircleShape)
+                            .background(if (firestoreSearchResults.isNotEmpty()) Color(0xFF00E676) else RessoPrimary)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = if (firestoreSearchResults.isNotEmpty()) {
+                            "🔥 Firestore Live: ${firestoreSearchResults.size} metadata matches"
+                        } else if (isFirestoreSearching) {
+                            "🔥 Querying Firestore in real-time..."
+                        } else {
+                            "🔥 Firestore Cloud Search Active"
+                        },
+                        fontSize = 11.sp,
+                        color = if (firestoreSearchResults.isNotEmpty()) Color(0xFF00E676) else RessoPrimary,
+                        fontWeight = FontWeight.SemiBold
+                    )
+                }
+                Text(
+                    text = "Live Sync",
+                    fontSize = 10.sp,
+                    color = RessoTextSecondary,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
 
         Spacer(modifier = Modifier.height(10.dp))
 
@@ -532,6 +573,43 @@ fun ExploreScreen(
                         }
                     }
                 }
+            } else if (searchError != null && displaySongs.isEmpty()) {
+                item(key = "search_error_state") {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 32.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            modifier = Modifier.padding(16.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Refresh,
+                                contentDescription = "Retry",
+                                tint = RessoPrimary,
+                                modifier = Modifier.size(48.dp)
+                            )
+                            Spacer(modifier = Modifier.height(10.dp))
+                            Text(
+                                text = searchError ?: "Unable to complete search",
+                                color = Color.White,
+                                fontWeight = FontWeight.Bold,
+                                fontSize = 15.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(12.dp))
+                            Button(
+                                onClick = { viewModel.searchMusic(searchKeyword) },
+                                colors = ButtonDefaults.buttonColors(containerColor = RessoPrimary),
+                                shape = RoundedCornerShape(20.dp)
+                            ) {
+                                Text("Retry Search", fontSize = 13.sp)
+                            }
+                        }
+                    }
+                }
             } else if (displaySongs.isEmpty()) {
                 item(key = "empty_state") {
                     Box(
@@ -584,6 +662,7 @@ fun ExploreScreen(
             } else {
                 itemsIndexed(displaySongs, key = { _, song -> song.id }) { _, song ->
                     val isPlayingThis = currentSong?.id == song.id
+                    val isFirestore = firestoreSearchResults.any { it.id == song.id }
                     SongListItem(
                         song = song,
                         isPlayingThis = isPlayingThis,
@@ -594,7 +673,8 @@ fun ExploreScreen(
                         onToggleLike = {
                             viewModel.toggleLikeSong(song)
                         },
-                        isOnline = song.id.startsWith("online_")
+                        isOnline = song.id.startsWith("online_") || song.id.startsWith("saavn_"),
+                        isFirestoreResult = isFirestore
                     )
                 }
             }
@@ -612,7 +692,8 @@ fun SongListItem(
     isPlayingThis: Boolean,
     onPlay: () -> Unit,
     onToggleLike: () -> Unit,
-    isOnline: Boolean = false
+    isOnline: Boolean = false,
+    isFirestoreResult: Boolean = false
 ) {
     Card(
         shape = RoundedCornerShape(14.dp),
@@ -691,7 +772,23 @@ fun SongListItem(
                     )
                 }
 
-                if (song.id.startsWith("yt_")) {
+                if (isFirestoreResult) {
+                    Spacer(modifier = Modifier.height(3.dp))
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(Color(0xFFFF9100).copy(alpha = 0.22f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = "🔥 Firestore Live",
+                            color = Color(0xFFFFB300),
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                    }
+                } else if (song.id.startsWith("yt_")) {
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically,

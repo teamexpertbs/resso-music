@@ -3,6 +3,7 @@ package com.resso.craka.data.repository
 import android.content.Context
 import androidx.room.Room
 import com.resso.craka.data.db.AppDatabase
+import com.resso.craka.data.firebase.FirebaseMusicManager
 import com.resso.craka.data.model.CommentEntity
 import com.resso.craka.data.model.PlaylistEntity
 import com.resso.craka.data.model.SongEntity
@@ -27,21 +28,75 @@ class MusicRepository(context: Context) {
     val commentDao = db.commentDao()
     val playlistDao = db.playlistDao()
     val searchService = MusicSearchService()
+    val firebaseManager = FirebaseMusicManager(appContext)
+    val firestoreMusicRepo = FirestoreMusicRepository(appContext, firebaseManager)
     private val catalogCache = CatalogCache(context)
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
+            songDao.purgeLocalSongs()
             seedInitialDataIfEmpty()
             songDao.clearPlaceholderLyrics()
             updateDefaultStreamsIfEmpty()
+            syncFromCloud()
         }
+    }
+
+    private suspend fun syncFromCloud() {
+        try {
+            val cloudLikes = firebaseManager.fetchCloudLikedSongs()
+            if (cloudLikes.isNotEmpty()) {
+                songDao.insertSongs(cloudLikes)
+            }
+            // Seed sample songs metadata to Firestore for instant live search
+            val sampleSongs = songDao.getInitialSongsSync()
+            if (sampleSongs.isNotEmpty()) {
+                firestoreMusicRepo.saveSongsBatch(sampleSongs)
+            }
+        } catch (_: Exception) {}
+    }
+
+    suspend fun getDynamicFirestoreSongs(limit: Int = 30, excludeIds: Set<String> = emptySet()): List<SongEntity> =
+        firestoreMusicRepo.getDynamicSongs(limit, excludeIds)
+
+    fun observeDynamicFirestoreSongs(limit: Int = 30): Flow<List<SongEntity>> =
+        firestoreMusicRepo.observeDynamicSongsRealtime(limit)
+
+    suspend fun recordSongActivityInFirestore(song: SongEntity) =
+        firestoreMusicRepo.recordSongActivity(song)
+
+    fun searchSongsInFirestoreRealtime(query: String): Flow<List<SongEntity>> =
+        firestoreMusicRepo.searchDynamicSongs(query)
+
+    suspend fun indexSongsInFirestore(songs: List<SongEntity>) {
+        firestoreMusicRepo.saveSongsBatch(songs)
     }
 
     fun getAllSongs(): Flow<List<SongEntity>> = songDao.getAllSongs()
     fun getLikedSongs(): Flow<List<SongEntity>> = songDao.getLikedSongs()
     suspend fun getSongById(id: String): SongEntity? = songDao.getSongById(id)
-    suspend fun toggleLike(id: String, currentLiked: Boolean) = songDao.setLiked(id, !currentLiked)
-    suspend fun insertCustomSong(song: SongEntity) = songDao.insertSong(song)
+
+    suspend fun toggleLike(id: String, currentLiked: Boolean) {
+        val newLiked = !currentLiked
+        songDao.setLiked(id, newLiked)
+        val song = songDao.getSongById(id)
+        if (song != null) {
+            CoroutineScope(Dispatchers.IO).launch {
+                firebaseManager.syncLikedSong(song, newLiked)
+            }
+        }
+    }
+
+    suspend fun insertCustomSong(song: SongEntity) {
+        if (!song.audioUrl.startsWith("http")) return
+        songDao.insertSong(song)
+        if (song.isLiked) {
+            CoroutineScope(Dispatchers.IO).launch {
+                firebaseManager.syncLikedSong(song, true)
+            }
+        }
+    }
+
     suspend fun updateSongVibe(songId: String, vibeUri: String) = songDao.updateSongVibe(songId, vibeUri)
 
     // Online & Local Search
@@ -54,13 +109,27 @@ class MusicRepository(context: Context) {
     }
 
     suspend fun getTrendingSongs(): List<SongEntity> {
-        catalogCache.read(TRENDING_KEY, TRENDING_CACHE_MS)?.let { return it }
-        val fresh = searchService.getTrendingSongs()
-        if (fresh.isNotEmpty()) catalogCache.write(TRENDING_KEY, fresh)
-        return fresh.ifEmpty { catalogCache.read(TRENDING_KEY, WEEK_MS).orEmpty() }
+        try {
+            val fresh = searchService.getTrendingSongs(35)
+            if (fresh.isNotEmpty()) {
+                songDao.insertSongs(fresh)
+                firestoreMusicRepo.saveSongsBatch(fresh)
+                return fresh.shuffled()
+            }
+        } catch (_: Exception) {}
+
+        try {
+            val dynamicFirestore = firestoreMusicRepo.getDynamicSongs(30)
+            if (dynamicFirestore.isNotEmpty()) {
+                songDao.insertSongs(dynamicFirestore)
+                return dynamicFirestore.shuffled()
+            }
+        } catch (_: Exception) {}
+
+        return songDao.getInitialSongsSync().shuffled()
     }
 
-    fun peekTrending(): List<SongEntity> = catalogCache.read(TRENDING_KEY, WEEK_MS).orEmpty()
+    fun peekTrending(): List<SongEntity> = emptyList()
 
     fun peekSearch(query: String): List<SongEntity> {
         val key = "search_${query.trim().lowercase()}"
@@ -81,20 +150,51 @@ class MusicRepository(context: Context) {
     // Vibes
     fun getVibesForSong(songId: String): Flow<List<VibeEntity>> = vibeDao.getVibesForSong(songId)
     fun getAllVibes(): Flow<List<VibeEntity>> = vibeDao.getAllVibes()
-    suspend fun saveVibe(vibe: VibeEntity): Long = vibeDao.insertVibe(vibe)
+    suspend fun saveVibe(vibe: VibeEntity): Long {
+        val id = vibeDao.insertVibe(vibe)
+        val withId = vibe.copy(id = id)
+        CoroutineScope(Dispatchers.IO).launch {
+            firebaseManager.syncVibe(withId)
+        }
+        return id
+    }
     suspend fun deleteVibe(id: Long) = vibeDao.deleteVibe(id)
 
     // Comments
     fun getCommentsForSong(songId: String): Flow<List<CommentEntity>> = commentDao.getCommentsForSong(songId)
-    suspend fun addComment(comment: CommentEntity): Long = commentDao.insertComment(comment)
+    suspend fun addComment(comment: CommentEntity): Long {
+        val id = commentDao.insertComment(comment)
+        val withId = comment.copy(id = id)
+        CoroutineScope(Dispatchers.IO).launch {
+            firebaseManager.syncComment(withId)
+        }
+        return id
+    }
     suspend fun toggleCommentLike(commentId: Long) = commentDao.toggleCommentLike(commentId)
 
     // Playlists
     fun getAllPlaylists(): Flow<List<PlaylistEntity>> = playlistDao.getAllPlaylists()
     suspend fun createPlaylist(name: String, description: String = ""): Long {
-        return playlistDao.insertPlaylist(
-            PlaylistEntity(name = name, description = description, songIdsCsv = "")
-        )
+        val entity = PlaylistEntity(name = name, description = description, songIdsCsv = "")
+        val id = playlistDao.insertPlaylist(entity)
+        val withId = entity.copy(id = id)
+        CoroutineScope(Dispatchers.IO).launch {
+            firebaseManager.syncPlaylist(withId)
+        }
+        return id
+    }
+
+    suspend fun addSongToPlaylist(playlistId: Long, song: SongEntity) {
+        val playlist = playlistDao.getPlaylist(playlistId) ?: return
+        val currentIds = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        if (song.id !in currentIds) {
+            currentIds.add(song.id)
+            val updated = playlist.copy(songIdsCsv = currentIds.joinToString(","))
+            playlistDao.updatePlaylist(updated)
+            CoroutineScope(Dispatchers.IO).launch {
+                firebaseManager.syncPlaylist(updated)
+            }
+        }
     }
 
     suspend fun songsInPlaylist(playlist: PlaylistEntity): List<SongEntity> {
@@ -107,8 +207,12 @@ class MusicRepository(context: Context) {
     fun recentSongs(): List<SongEntity> = catalogCache.read("recent_played", WEEK_MS).orEmpty()
 
     fun rememberRecent(song: SongEntity) {
+        if (!song.audioUrl.startsWith("http")) return
         val next = listOf(song) + recentSongs().filter { it.id != song.id }
         catalogCache.write("recent_played", next.take(30))
+        CoroutineScope(Dispatchers.IO).launch {
+            firebaseManager.syncHistory(song)
+        }
     }
 
     suspend fun movePlaylistSong(playlistId: Long, from: Int, to: Int) {
@@ -117,7 +221,11 @@ class MusicRepository(context: Context) {
         if (from !in ids.indices || to !in ids.indices) return
         val item = ids.removeAt(from)
         ids.add(to, item)
-        playlistDao.updatePlaylist(playlist.copy(songIdsCsv = ids.joinToString(",")))
+        val updated = playlist.copy(songIdsCsv = ids.joinToString(","))
+        playlistDao.updatePlaylist(updated)
+        CoroutineScope(Dispatchers.IO).launch {
+            firebaseManager.syncPlaylist(updated)
+        }
     }
 
     suspend fun getPlaylist(id: Long) = playlistDao.getPlaylist(id)
@@ -146,16 +254,6 @@ class MusicRepository(context: Context) {
         }
     }
 
-    suspend fun addSongToPlaylist(playlistId: Long, song: SongEntity) {
-        if (songDao.getSongById(song.id) == null) {
-            songDao.insertSong(song)
-        }
-        val playlist = playlistDao.getPlaylist(playlistId) ?: return
-        val ids = playlist.songIdsCsv.split(",").map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
-        if (song.id !in ids) ids.add(song.id)
-        playlistDao.updatePlaylist(playlist.copy(songIdsCsv = ids.joinToString(",")))
-    }
-
     companion object {
         private const val TRENDING_KEY = "trending"
         private const val TRENDING_CACHE_MS = 12 * 60 * 60 * 1000L
@@ -164,63 +262,10 @@ class MusicRepository(context: Context) {
     }
 
     suspend fun scanDeviceAudio() = kotlinx.coroutines.withContext(Dispatchers.IO) {
+        // Enforce 100% online streaming songs: purge local audio files
         try {
-            val projection = arrayOf(
-                android.provider.MediaStore.Audio.Media._ID,
-                android.provider.MediaStore.Audio.Media.TITLE,
-                android.provider.MediaStore.Audio.Media.ARTIST,
-                android.provider.MediaStore.Audio.Media.ALBUM,
-                android.provider.MediaStore.Audio.Media.DURATION,
-                android.provider.MediaStore.Audio.Media.DATA
-            )
-            val selection = "${android.provider.MediaStore.Audio.Media.IS_MUSIC} != 0"
-            val cursor = appContext.contentResolver.query(
-                android.provider.MediaStore.Audio.Media.EXTERNAL_CONTENT_URI,
-                projection,
-                selection,
-                null,
-                "${android.provider.MediaStore.Audio.Media.DATE_ADDED} DESC"
-            )
-            val localSongs = mutableListOf<SongEntity>()
-            cursor?.use { c ->
-                val idCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media._ID)
-                val titleCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.TITLE)
-                val artistCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.ARTIST)
-                val albumCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.ALBUM)
-                val durCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.DURATION)
-                val dataCol = c.getColumnIndex(android.provider.MediaStore.Audio.Media.DATA)
-                while (c.moveToNext()) {
-                    if (idCol < 0 || titleCol < 0 || dataCol < 0) continue
-                    val mediaId = c.getLong(idCol)
-                    val title = c.getString(titleCol) ?: "Unknown"
-                    val artist = if (artistCol >= 0) c.getString(artistCol) ?: "Unknown Artist" else "Unknown Artist"
-                    val album = if (albumCol >= 0) c.getString(albumCol) ?: "Local" else "Local"
-                    val durationMs = if (durCol >= 0) c.getLong(durCol) else 0L
-                    val data = c.getString(dataCol) ?: ""
-                    if (durationMs > 10000L && data.isNotBlank()) {
-                        localSongs.add(
-                            SongEntity(
-                                id = "local_$mediaId",
-                                title = title,
-                                artist = artist,
-                                album = album,
-                                durationMs = durationMs,
-                                audioUrl = data,
-                                albumArtUrl = "",
-                                genre = "Local Device",
-                                mood = "Offline",
-                                isLiked = false
-                            )
-                        )
-                    }
-                }
-            }
-            if (localSongs.isNotEmpty()) {
-                songDao.insertSongs(localSongs)
-            }
-        } catch (e: Exception) {
-            android.util.Log.w("MusicRepository", "scanDeviceAudio: ${e.message}")
-        }
+            songDao.purgeLocalSongs()
+        } catch (_: Exception) {}
     }
 
     private suspend fun updateDefaultStreamsIfEmpty() {

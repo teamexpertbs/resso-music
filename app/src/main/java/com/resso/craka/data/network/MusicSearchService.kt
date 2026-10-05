@@ -1,15 +1,17 @@
 package com.resso.craka.data.network
 
-import android.util.Base64
-import android.util.Log
 import com.resso.craka.data.model.SongEntity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withContext
+import okhttp3.Call
+import okhttp3.Callback
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.IOException
 import java.net.URLEncoder
 import java.util.concurrent.TimeUnit
 import javax.crypto.Cipher
@@ -19,48 +21,89 @@ import kotlin.coroutines.resumeWithException
 
 class MusicSearchService {
     private val client = OkHttpClient.Builder()
-        .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .connectTimeout(12, TimeUnit.SECONDS)
+        .readTimeout(12, TimeUnit.SECONDS)
         .build()
 
     companion object {
         private const val TAG = "MusicSearchService"
         private const val DES_KEY = "38346591"
-        // Optional custom Vercel API endpoint. If empty, uses direct JioSaavn with native decryption.
-        var customApiBaseUrl: String = "https://crakaresso-music-api.vercel.app"
+        var customApiBaseUrl: String = ""
+
+        private fun logE(tag: String, msg: String, tr: Throwable? = null) {
+            try {
+                android.util.Log.e(tag, msg, tr)
+            } catch (_: Throwable) {
+                System.err.println("[$tag] ERROR: $msg ${tr?.message.orEmpty()}")
+            }
+        }
+
+        private fun logW(tag: String, msg: String) {
+            try {
+                android.util.Log.w(tag, msg)
+            } catch (_: Throwable) {
+                println("[$tag] WARN: $msg")
+            }
+        }
+
+        private fun safeDecodeBase64(input: String): ByteArray {
+            val clean = input.trim()
+            return try {
+                java.util.Base64.getDecoder().decode(clean)
+            } catch (_: Throwable) {
+                try {
+                    android.util.Base64.decode(clean, android.util.Base64.DEFAULT)
+                } catch (_: Throwable) {
+                    clean.toByteArray()
+                }
+            }
+        }
     }
 
     private suspend fun fetchText(request: Request): Pair<Int, String?> {
         return suspendCancellableCoroutine { cont ->
             val call = client.newCall(request)
             cont.invokeOnCancellation { call.cancel() }
-            try {
-                call.execute().use { response ->
-                    val text = response.body?.string()
-                    if (cont.isActive) cont.resume(response.code to text)
+            call.enqueue(object : Callback {
+                override fun onResponse(call: Call, response: Response) {
+                    try {
+                        val body = response.body?.string()
+                        if (cont.isActive) cont.resume(response.code to body)
+                    } catch (e: Exception) {
+                        if (cont.isActive) cont.resumeWithException(e)
+                    } finally {
+                        response.close()
+                    }
                 }
-            } catch (e: Exception) {
-                if (cont.isActive) cont.resumeWithException(e)
-            }
+
+                override fun onFailure(call: Call, e: IOException) {
+                    if (cont.isActive) cont.resumeWithException(e)
+                }
+            })
         }
     }
 
     /**
-     * Decrypts JioSaavn encrypted_media_url into 320kbps high-quality direct stream URL
+     * Decrypts JioSaavn encrypted_media_url into high-quality direct stream URL.
+     * Uses 320kbps only if confirmed available, otherwise 160kbps to prevent HTTP 404 CDN errors.
      */
-    private fun decryptSaavnUrl(encryptedUrl: String): String? {
+    fun decryptSaavnUrl(encryptedUrl: String, has320: Boolean = false): String? {
+        if (encryptedUrl.isBlank()) return null
         return try {
             val keyBytes = DES_KEY.toByteArray(Charsets.UTF_8)
             val keySpec = SecretKeySpec(keyBytes, "DES")
             val cipher = Cipher.getInstance("DES/ECB/PKCS5Padding")
             cipher.init(Cipher.DECRYPT_MODE, keySpec)
-            val decodedBytes = Base64.decode(encryptedUrl, Base64.DEFAULT)
+            val decodedBytes = safeDecodeBase64(encryptedUrl)
             val decryptedBytes = cipher.doFinal(decodedBytes)
             val streamUrl = String(decryptedBytes, Charsets.UTF_8)
-            // Upgrade stream to 320kbps HD quality
-            streamUrl.replace("_96.mp4", "_320.mp4").replace("_160.mp4", "_320.mp4")
+            if (has320) {
+                streamUrl.replace("_96.mp4", "_320.mp4").replace("_160.mp4", "_320.mp4")
+            } else {
+                streamUrl.replace("_96.mp4", "_160.mp4")
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "Decryption error: ${e.message}")
+            logW(TAG, "Decryption error for URL: ${e.message}")
             null
         }
     }
@@ -82,9 +125,33 @@ class MusicSearchService {
         return@withContext searchDirectJioSaavn(trimmed, limit)
     }
 
-    suspend fun getTrendingSongs(limit: Int = 15): List<SongEntity> = withContext(Dispatchers.IO) {
-        val songs = searchSongs("Trending Hindi Hits", limit)
-        if (songs.isNotEmpty()) songs else searchSongs("Top Bollywood", limit)
+    suspend fun getTrendingSongs(limit: Int = 30): List<SongEntity> = withContext(Dispatchers.IO) {
+        val queryPool = listOf(
+            "Trending Hindi Hits",
+            "Top Bollywood Songs",
+            "Latest Hindi Songs 2025",
+            "Arijit Singh Hits",
+            "Top Punjabi Hits",
+            "Badshah Party Hits",
+            "Romantic Bollywood Hits",
+            "Sidhu Moose Wala",
+            "Diljit Dosanjh Hits",
+            "Lo-Fi Hindi Songs",
+            "Atif Aslam Hits",
+            "Anirudh Hits Hindi"
+        ).shuffled()
+
+        val results = mutableListOf<SongEntity>()
+        for (query in queryPool.take(3)) {
+            val batch = searchSongs(query, limit = 15)
+            for (s in batch) {
+                if (results.none { it.id == s.id }) {
+                    results.add(s)
+                }
+            }
+            if (results.size >= limit) break
+        }
+        if (results.isNotEmpty()) results.shuffled() else searchDirectJioSaavn("Hindi Songs", limit)
     }
 
     private suspend fun searchViaVercelApi(query: String, limit: Int): List<SongEntity> {
@@ -131,59 +198,103 @@ class MusicSearchService {
             }
             list
         } catch (e: Exception) {
-            Log.w(TAG, "Vercel search failed, falling back to direct: ${e.message}")
+            logW(TAG, "Vercel search failed, falling back to direct: ${e.message}")
             emptyList()
         }
     }
 
     private suspend fun searchDirectJioSaavn(query: String, limit: Int): List<SongEntity> {
+        val trimmed = query.trim()
+        if (trimmed.isBlank()) return emptyList()
+
         return try {
-            val encoded = URLEncoder.encode(query, "UTF-8")
+            val encoded = URLEncoder.encode(trimmed, "UTF-8")
             val searchUrl = "https://www.jiosaavn.com/api.php?__call=search.getResults&_format=json&_marker=0&cc=in&n=$limit&p=1&q=$encoded"
             val request = Request.Builder()
                 .url(searchUrl)
-                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+                .header("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36")
+                .header("Accept", "application/json, text/plain, */*")
+                .header("Accept-Language", "en-US,en;q=0.9,hi;q=0.8")
                 .build()
 
             val (code, body) = fetchText(request)
-            if (code !in 200..299 || body == null) return emptyList()
+            if (code !in 200..299 || body.isNullOrBlank()) return emptyList()
 
-            val json = JSONObject(body)
-            val results = json.optJSONArray("results") ?: return emptyList()
+            val cleanBody = body.trim().removePrefix("/**/").removePrefix("(").removeSuffix(");").removeSuffix(")")
+            val json = JSONObject(cleanBody)
+            val results = json.optJSONArray("results")
+                ?: json.optJSONObject("data")?.optJSONArray("results")
+                ?: return emptyList()
+
             val list = mutableListOf<SongEntity>()
 
             for (i in 0 until results.length()) {
-                val item = results.getJSONObject(i)
-                val encMediaUrl = item.optString("encrypted_media_url", "")
+                val item = results.optJSONObject(i) ?: continue
+                val moreInfo = item.optJSONObject("more_info")
+
+                val encMediaUrl = item.optString("encrypted_media_url").ifBlank {
+                    moreInfo?.optString("encrypted_media_url").orEmpty()
+                }
                 if (encMediaUrl.isBlank()) continue
 
-                val audioUrl = decryptSaavnUrl(encMediaUrl) ?: continue
-                val id = item.optString("id", "")
-                val rawTitle = item.optString("song", "")
-                val rawSingers = item.optString("primary_artists", "").ifBlank {
-                    item.optString("singers", "Various Artists")
+                val has320 = (item.optString("320kbps").ifBlank {
+                    moreInfo?.optString("320kbps").orEmpty()
+                }).equals("true", ignoreCase = true)
+
+                val audioUrl = decryptSaavnUrl(encMediaUrl, has320) ?: continue
+                val id = item.optString("id").ifBlank {
+                    item.optString("songid").ifBlank { java.util.UUID.randomUUID().toString() }
                 }
-                val rawAlbum = item.optString("album", "Single")
-                val img = item.optString("image", "").replace("150x150.jpg", "500x500.jpg")
-                val durationSec = item.optLong("duration", 210L)
+
+                val rawTitle = item.optString("song").ifBlank {
+                    item.optString("title").ifBlank {
+                        moreInfo?.optString("song").orEmpty()
+                    }
+                }
+                if (rawTitle.isBlank()) continue
+
+                val rawSingers = item.optString("primary_artists").ifBlank {
+                    item.optString("singers").ifBlank {
+                        moreInfo?.optString("primary_artists")?.ifBlank {
+                            moreInfo.optString("singers")
+                        }.orEmpty()
+                    }
+                }.ifBlank { "Various Artists" }
+
+                val rawAlbum = item.optString("album").ifBlank {
+                    moreInfo?.optString("album").orEmpty()
+                }.ifBlank { "Single" }
+
+                val img = (item.optString("image").ifBlank {
+                    moreInfo?.optString("image").orEmpty()
+                }).replace("150x150.jpg", "500x500.jpg")
+
+                val rawDuration = item.optString("duration").ifBlank {
+                    moreInfo?.optString("duration").orEmpty()
+                }
+                val durationSec = rawDuration.toLongOrNull() ?: item.optLong("duration", 210L)
+
+                val title = decodeHtmlEntities(rawTitle)
+                val artist = decodeHtmlEntities(rawSingers)
+                val album = decodeHtmlEntities(rawAlbum)
 
                 list.add(
                     SongEntity(
                         id = "saavn_$id",
-                        title = decodeHtmlEntities(rawTitle),
-                        artist = decodeHtmlEntities(rawSingers),
-                        album = decodeHtmlEntities(rawAlbum),
-                        durationMs = durationSec * 1000L,
+                        title = title,
+                        artist = artist,
+                        album = album,
+                        durationMs = (durationSec * 1000L).coerceAtLeast(10_000L),
                         audioUrl = audioUrl,
                         albumArtUrl = img,
                         genre = "Bollywood",
-                        mood = mapTextToMood("$rawTitle $rawSingers")
+                        mood = mapTextToMood("$title $artist")
                     )
                 )
             }
             list
         } catch (e: Exception) {
-            Log.e(TAG, "JioSaavn search error: ${e.message}", e)
+            logE(TAG, "JioSaavn search error: ${e.message}", e)
             emptyList()
         }
     }
@@ -225,7 +336,7 @@ class MusicSearchService {
             }
             bestSynced.ifBlank { bestPlain.ifBlank { null } }
         } catch (e: Exception) {
-            Log.w(TAG, "Lyrics search failed: ${e.message}")
+            logW(TAG, "Lyrics search failed: ${e.message}")
             null
         }
     }

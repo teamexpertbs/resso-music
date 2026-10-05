@@ -113,35 +113,17 @@ class MainActivity : ComponentActivity() {
             MyApplicationTheme {
                 val context = LocalContext.current
 
-                // Runtime permissions (Notifications, Local Audio/Storage, Record Audio/EQ, Camera/Flash)
-                val permissionsLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestMultiplePermissions()
-                ) { grants ->
-                    val grantedAudio = grants[Manifest.permission.READ_MEDIA_AUDIO] == true ||
-                        grants[Manifest.permission.READ_EXTERNAL_STORAGE] == true
-                    if (grantedAudio) {
-                        musicViewModel.scanDeviceAudio()
-                    }
-                }
+                // Notification permission for background playback controls
+                val notificationPermissionLauncher = rememberLauncherForActivityResult(
+                    contract = ActivityResultContracts.RequestPermission()
+                ) { /* Notification permission result handled */ }
 
                 LaunchedEffect(Unit) {
-                    val permissions = mutableListOf<String>()
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                            permissions.add(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_MEDIA_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                            permissions.add(Manifest.permission.READ_MEDIA_AUDIO)
-                        }
-                    } else {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED) {
-                            permissions.add(Manifest.permission.READ_EXTERNAL_STORAGE)
+                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
                     }
-                    if (permissions.isNotEmpty()) {
-                        permissionsLauncher.launch(permissions.toTypedArray())
-                    }
-                    musicViewModel.scanDeviceAudio()
                 }
 
                 var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library"

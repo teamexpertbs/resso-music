@@ -102,6 +102,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.resso.craka.player.AppEqualizer
 import com.resso.craka.ui.components.AlbumArtwork
+import com.resso.craka.ui.components.PlayerSeekBar
 import com.resso.craka.ui.components.VideoBackground
 import com.resso.craka.ui.theme.RessoCardBg
 import com.resso.craka.ui.theme.RessoGreen
@@ -424,43 +425,24 @@ fun VibePlayerScreen(
                 }
             }
 
-            var isUserSeeking by remember { mutableStateOf(false) }
-            var seekValue by remember { mutableFloatStateOf(0f) }
-            val progress = if (isUserSeeking) seekValue else {
-                if (duration > 0) (currentPos.toFloat() / duration.toFloat()).coerceIn(0f, 1f) else 0f
-            }
-            PlayerToolRow(viewModel)
-            Slider(
-                value = progress,
-                onValueChange = {
-                    isUserSeeking = true
-                    seekValue = it
-                },
-                onValueChangeFinished = {
-                    viewModel.seekTo((seekValue * duration).toLong())
-                    isUserSeeking = false
-                },
-                colors = SliderDefaults.colors(
-                    thumbColor = Color.White,
-                    activeTrackColor = RessoPrimary,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.18f)
-                ),
+            Spacer(modifier = Modifier.height(10.dp))
+
+            // Seek Bar (Slider) Component reflecting song progress & manual audio seeking
+            PlayerSeekBar(
+                currentPositionMs = currentPos,
+                durationMs = duration,
+                onSeekTo = { targetMs -> viewModel.seekTo(targetMs) },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(28.dp)
-                    .testTag("playback_progress_slider")
+                    .padding(vertical = 4.dp)
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Text(text = LyricsParser.formatTime(currentPos), color = RessoTextSecondary, fontSize = 11.sp)
-                Text(text = LyricsParser.formatTime(duration), color = RessoTextSecondary, fontSize = 11.sp)
-            }
+
+            Spacer(modifier = Modifier.height(4.dp))
+
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 2.dp, bottom = 6.dp),
+                    .padding(top = 2.dp, bottom = 4.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
                 verticalAlignment = Alignment.CenterVertically
             ) {
@@ -501,6 +483,9 @@ fun VibePlayerScreen(
                     )
                 }
             }
+
+            // Secondary tools row (Sleep, 8D Audio, Vibe, EQ, Save, Sync)
+            PlayerToolRow(viewModel)
         }
 
         Column(
