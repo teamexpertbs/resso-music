@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.content.Intent
 import android.widget.Toast
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
@@ -25,6 +26,7 @@ import androidx.compose.foundation.gestures.detectVerticalDragGestures
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -155,26 +157,9 @@ fun VibePlayerScreen(
     val heartScale = remember { Animatable(0f) }
     val isVideoMode by viewModel.isVideoMode.collectAsState()
     val isLyricsVisible by viewModel.isLyricsVisible.collectAsState()
-    val isFlashSyncEnabled by viewModel.isFlashSyncEnabled.collectAsState()
 
-    // Camera permission launcher for back flashlight / beat sync
-    val cameraPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted: Boolean ->
-        if (isGranted) {
-            viewModel.toggleFlashSync()
-            Toast.makeText(
-                context,
-                "⚡ Beat Flash: ON (Song beat par flashlight chalegi)",
-                Toast.LENGTH_SHORT
-            ).show()
-        } else {
-            Toast.makeText(
-                context,
-                "Flashlight (Torch) ke liye Camera permission zaroori hai",
-                Toast.LENGTH_LONG
-            ).show()
-        }
+    BackHandler(enabled = isLyricsVisible) {
+        viewModel.setLyricsVisible(false)
     }
 
     // Auto-scroll lyrics smoothly to active index when lyrics are open
@@ -182,7 +167,7 @@ fun VibePlayerScreen(
         if (isLyricsVisible && lyrics.isNotEmpty() && activeLyricIndex in lyrics.indices) {
             try {
                 listState.animateScrollToItem(
-                    index = (activeLyricIndex - 1).coerceAtLeast(0)
+                    index = (activeLyricIndex - 2).coerceAtLeast(0)
                 )
             } catch (_: Exception) {
             }
@@ -275,15 +260,45 @@ fun VibePlayerScreen(
                         tint = Color.White
                     )
                 }
-                Text(
-                    text = "resso",
-                    modifier = Modifier.weight(1f),
-                    fontSize = 22.sp,
-                    fontWeight = FontWeight.ExtraBold,
-                    color = Color.White,
-                    letterSpacing = (-0.8).sp,
-                    textAlign = TextAlign.Center
-                )
+                Row(
+                    modifier = Modifier
+                        .weight(1f)
+                        .testTag("top_header_resso_lyrics"),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "resso",
+                        fontSize = if (!isLyricsVisible) 22.sp else 18.sp,
+                        fontWeight = if (!isLyricsVisible) FontWeight.ExtraBold else FontWeight.Medium,
+                        color = if (!isLyricsVisible) Color.White else Color.White.copy(alpha = 0.45f),
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.setLyricsVisible(false) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("header_tab_resso")
+                    )
+                    Text(
+                        text = "/",
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Light,
+                        color = Color.White.copy(alpha = 0.35f),
+                        modifier = Modifier.padding(horizontal = 2.dp)
+                    )
+                    Text(
+                        text = "lyrics",
+                        fontSize = if (isLyricsVisible) 22.sp else 18.sp,
+                        fontWeight = if (isLyricsVisible) FontWeight.ExtraBold else FontWeight.Medium,
+                        color = if (isLyricsVisible) Color.White else Color.White.copy(alpha = 0.45f),
+                        letterSpacing = (-0.5).sp,
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .clickable { viewModel.setLyricsVisible(true) }
+                            .padding(horizontal = 6.dp, vertical = 4.dp)
+                            .testTag("header_tab_lyrics")
+                    )
+                }
                 if (currentSong?.id?.startsWith("yt_") == true) {
                     PlayerTopActionButton(
                         icon = Icons.Default.MusicVideo,
@@ -304,21 +319,21 @@ fun VibePlayerScreen(
             }
 
             if (!showMusicVideo && !isLyricsVisible) {
-                Box(
+                BoxWithConstraints(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 36.dp, vertical = 12.dp),
+                        .padding(horizontal = 24.dp, vertical = 8.dp),
                     contentAlignment = Alignment.Center
                 ) {
+                    val artSize = minOf(maxWidth, maxHeight)
                     AlbumArtwork(
                         songId = currentSong?.id,
                         albumArtUrl = currentSong?.albumArtUrl,
                         contentDescription = currentSong?.title ?: "Song cover",
                         modifier = Modifier
-                            .fillMaxHeight()
-                            .aspectRatio(1f, matchHeightConstraintsFirst = true)
-                            .clip(RoundedCornerShape(8.dp))
+                            .size(artSize)
+                            .clip(RoundedCornerShape(14.dp))
                             .testTag("player_album_art")
                     )
                 }
@@ -330,7 +345,9 @@ fun VibePlayerScreen(
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                     textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp)
                 )
                 Text(
                     text = currentSong?.artist ?: "",
@@ -341,68 +358,98 @@ fun VibePlayerScreen(
                     textAlign = TextAlign.Center,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 4.dp)
+                        .padding(top = 4.dp, start = 20.dp, end = 20.dp)
                         .clickable {
                             val artist = currentSong?.artist?.substringBefore(",")?.trim().orEmpty()
                             if (artist.isNotBlank()) onOpenArtist(artist)
                         }
                 )
-                val lyricLine = lyrics.getOrNull(activeLyricIndex)?.text
-                    ?: lyricsStatus.ifBlank { "Lyrics" }
-                Text(
-                    text = lyricLine,
-                    color = Color.White.copy(alpha = 0.92f),
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    maxLines = 2,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
+            } else if (isLyricsVisible && !showMusicVideo) {
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 14.dp, start = 12.dp, end = 12.dp)
-                        .clickable { viewModel.toggleLyrics() }
-                        .testTag("toggle_lyrics_chip")
-                )
-            } else if (isLyricsVisible && !showMusicVideo) {
-                Text(
-                    text = currentSong?.title ?: "",
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 16.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.padding(top = 8.dp, end = 56.dp)
-                )
+                        .padding(top = 8.dp, bottom = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = currentSong?.title ?: "",
+                            color = Color.White,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 18.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                        Text(
+                            text = currentSong?.artist ?: "",
+                            color = RessoTextSecondary,
+                            fontSize = 13.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    IconButton(
+                        onClick = { viewModel.setLyricsVisible(false) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("close_lyrics_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = "Close lyrics",
+                            tint = Color.White.copy(alpha = 0.7f)
+                        )
+                    }
+                }
                 LazyColumn(
                     state = listState,
+                    contentPadding = PaddingValues(top = 16.dp, bottom = 40.dp),
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(top = 8.dp, end = 56.dp)
-                        .testTag("lyrics_compact_container")
+                        .testTag("lyrics_fullscreen_container")
                 ) {
                     if (lyrics.isEmpty()) {
                         item {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 48.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                    Icon(
+                                        imageVector = Icons.Default.FormatQuote,
+                                        contentDescription = null,
+                                        tint = Color.White.copy(alpha = 0.3f),
+                                        modifier = Modifier.size(48.dp)
+                                    )
+                                    Spacer(modifier = Modifier.height(12.dp))
+                                    Text(
+                                        text = lyricsStatus.ifBlank { "Lyrics not available for this song" },
+                                        color = RessoTextSecondary,
+                                        fontSize = 15.sp,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
+                            }
+                        }
+                    } else {
+                        itemsIndexed(lyrics) { index, lyric ->
+                            val isActive = index == activeLyricIndex
                             Text(
-                                text = lyricsStatus.ifBlank { "Lyrics not available for this song" },
-                                color = RessoTextSecondary,
-                                modifier = Modifier.padding(top = 24.dp)
+                                text = lyric.text,
+                                fontSize = if (isActive) 23.sp else 16.sp,
+                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.38f),
+                                lineHeight = if (isActive) 32.sp else 24.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 10.dp, horizontal = 4.dp)
+                                    .clickable { viewModel.seekToLyric(lyric.timeMs) }
+                                    .testTag("lyric_line_$index")
                             )
                         }
-                    }
-                    itemsIndexed(lyrics) { index, lyric ->
-                        val isActive = index == activeLyricIndex
-                        Text(
-                            text = lyric.text,
-                            fontSize = if (isActive) 22.sp else 16.sp,
-                            fontWeight = if (isActive) FontWeight.Bold else FontWeight.Medium,
-                            color = if (isActive) Color.White else Color.White.copy(alpha = 0.38f),
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp)
-                                .clickable { viewModel.seekToLyric(lyric.timeMs) }
-                                .testTag("lyric_line_$index")
-                        )
                     }
                 }
             } else {
@@ -488,62 +535,6 @@ fun VibePlayerScreen(
             PlayerToolRow(viewModel)
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.CenterEnd)
-                .padding(end = 8.dp, bottom = 72.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Heart / Like Button
-            PlayerActionButton(
-                icon = if (currentSong?.isLiked == true) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
-                label = if (currentSong?.isLiked == true) "Liked" else "Like",
-                tint = if (currentSong?.isLiked == true) RessoPrimary else Color.White,
-                tag = "player_like_button",
-                onClick = { viewModel.toggleLikeCurrentSong() }
-            )
-
-            // Comments Button with Badge
-            Box(contentAlignment = Alignment.TopEnd) {
-                PlayerActionButton(
-                    icon = Icons.Default.ChatBubble,
-                    label = "${comments.size}",
-                    tint = Color.White,
-                    tag = "player_comments_button",
-                    onClick = { viewModel.setCommentsSheetOpen(true) }
-                )
-            }
-
-            PlayerActionButton(
-                icon = Icons.Default.Share,
-                label = "Share",
-                tint = Color.White,
-                tag = "player_share_button",
-                onClick = {
-                    val song = currentSong
-                    val link = if (song?.id?.startsWith("yt_") == true) {
-                        "https://www.youtube.com/watch?v=${song.id.removePrefix("yt_")}"
-                    } else {
-                        "Listening to ${song?.title ?: "a song"} by ${song?.artist ?: "Resso"}"
-                    }
-                    val share = Intent(Intent.ACTION_SEND).apply {
-                        type = "text/plain"
-                        putExtra(Intent.EXTRA_TEXT, link)
-                    }
-                    context.startActivity(Intent.createChooser(share, "Share"))
-                }
-            )
-
-            PlayerActionButton(
-                icon = Icons.Default.FormatQuote,
-                label = "Lyrics",
-                tint = if (isLyricsVisible) RessoPrimary else Color.White,
-                tag = "player_lyric_poster_button",
-                onClick = { viewModel.toggleLyrics() }
-            )
-        }
-
         // 5. Double Tap Animated Heart Overlay
         if (showBigHeart) {
             Icon(
@@ -626,12 +617,14 @@ private fun PlayerTopActionButton(
 
 @Composable
 private fun PlayerToolRow(viewModel: MusicViewModel) {
+    val context = LocalContext.current
     val currentSong by viewModel.currentSong.collectAsState()
     val currentVibeUri by viewModel.currentVibeUri.collectAsState()
     val sleep by viewModel.sleepMinutesLeft.collectAsState()
     val offset by viewModel.lyricOffsetMs.collectAsState()
     val is8D by viewModel.is8DAudioEnabled.collectAsState()
     var sheet by remember { mutableStateOf<String?>(null) }
+
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -640,8 +633,8 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
         ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { sheet = "sleep" }
-        ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D") { viewModel.toggle8DAudio() }
-        ToolChip(if (!currentVibeUri.isNullOrBlank()) "✨ Vibe ON" else "✨ Vibe") { sheet = "vibe" }
+        ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D", selected = is8D) { viewModel.toggle8DAudio() }
+        ToolChip(if (!currentVibeUri.isNullOrBlank()) "✨ Vibe ON" else "✨ Vibe", selected = !currentVibeUri.isNullOrBlank()) { sheet = "vibe" }
         ToolChip("EQ") { sheet = "eq" }
         ToolChip("Save") { viewModel.saveCurrentOffline() }
         ToolChip("Sync") { sheet = "offset" }
@@ -796,14 +789,19 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
 }
 
 @Composable
-private fun ToolChip(label: String, onClick: () -> Unit) {
+private fun ToolChip(
+    label: String,
+    selected: Boolean = false,
+    onClick: () -> Unit
+) {
     Text(
         text = label,
-        color = Color.White,
+        color = if (selected) Color.Black else Color.White,
+        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
         fontSize = 12.sp,
         modifier = Modifier
             .clip(RoundedCornerShape(20.dp))
-            .background(Color.White.copy(alpha = 0.12f))
+            .background(if (selected) RessoPrimary else Color.White.copy(alpha = 0.12f))
             .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 6.dp)
     )

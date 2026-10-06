@@ -164,6 +164,14 @@ class FirebaseMusicManager(private val context: Context) {
                     val audioUrl = doc.getString("audioUrl") ?: ""
                     if (audioUrl.isBlank()) return@mapNotNull null
 
+                    val art = doc.getString("albumArtUrl")
+                        ?: doc.getString("albumArt")
+                        ?: doc.getString("imageUrl")
+                        ?: doc.getString("image")
+                        ?: doc.getString("thumbnail")
+                        ?: doc.getString("cover")
+                        ?: ""
+
                     SongEntity(
                         id = id,
                         title = title,
@@ -171,7 +179,7 @@ class FirebaseMusicManager(private val context: Context) {
                         album = doc.getString("album") ?: "Single",
                         durationMs = doc.getLong("durationMs") ?: 210000L,
                         audioUrl = audioUrl,
-                        albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                        albumArtUrl = art,
                         lyricsLrc = doc.getString("lyricsLrc") ?: "",
                         genre = doc.getString("genre") ?: "Pop",
                         mood = doc.getString("mood") ?: "Chill",
@@ -370,6 +378,13 @@ class FirebaseMusicManager(private val context: Context) {
                             keywords.any { it.contains(cleanQuery) || cleanQuery.contains(it) }
 
                         if (matches && audioUrl.isNotBlank()) {
+                            val art = doc.getString("albumArtUrl")
+                                ?: doc.getString("albumArt")
+                                ?: doc.getString("imageUrl")
+                                ?: doc.getString("image")
+                                ?: doc.getString("thumbnail")
+                                ?: doc.getString("cover")
+                                ?: ""
                             SongEntity(
                                 id = id,
                                 title = title,
@@ -377,7 +392,7 @@ class FirebaseMusicManager(private val context: Context) {
                                 album = album,
                                 durationMs = doc.getLong("durationMs") ?: 210000L,
                                 audioUrl = audioUrl,
-                                albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                                albumArtUrl = art,
                                 lyricsLrc = doc.getString("lyricsLrc") ?: "",
                                 genre = genre,
                                 mood = doc.getString("mood") ?: "Chill"

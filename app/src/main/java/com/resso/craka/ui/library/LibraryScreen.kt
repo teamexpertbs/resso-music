@@ -1,5 +1,6 @@
 package com.resso.craka.ui.library
 
+import androidx.activity.compose.BackHandler
 import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -7,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,7 +21,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.AutoAwesome
@@ -95,6 +99,11 @@ fun LibraryScreen(
 
     val recentSongs by viewModel.recentSongs.collectAsState()
     val tabTitles = listOf("Liked", "Recent", "Playlists")
+
+    BackHandler(enabled = openPlaylist != null || isNewPlaylistDialogOpen) {
+        openPlaylist = null
+        isNewPlaylistDialogOpen = false
+    }
 
     Column(
         modifier = modifier
@@ -201,7 +210,10 @@ fun LibraryScreen(
                         icon = Icons.Default.Favorite
                     )
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         itemsIndexed(likedSongs, key = { _, s -> s.id }) { index, song ->
                             SongListItem(
                                 song = song,
@@ -224,7 +236,10 @@ fun LibraryScreen(
                         icon = Icons.Default.MusicNote
                     )
                 } else {
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         itemsIndexed(recentSongs, key = { _, s -> s.id }) { index, song ->
                             SongListItem(
                                 song = song,
@@ -266,7 +281,10 @@ fun LibraryScreen(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    LazyColumn(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    LazyColumn(
+                        contentPadding = PaddingValues(bottom = 28.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
                         items(allPlaylists, key = { it.id }) { playlist ->
                             Card(
                                 shape = RoundedCornerShape(14.dp),
@@ -409,7 +427,7 @@ fun LibraryScreen(
                 if (openPlaylistSongs.isEmpty()) {
                     Text("This playlist is empty. Use + on the playlist to add the song that is playing.", color = RessoTextSecondary)
                 } else {
-                    Column {
+                    Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                         openPlaylistSongs.forEachIndexed { index, song ->
                             Row(verticalAlignment = Alignment.CenterVertically) {
                                 Text(

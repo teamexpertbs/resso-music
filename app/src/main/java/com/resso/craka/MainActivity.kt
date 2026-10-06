@@ -6,6 +6,7 @@ import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
@@ -70,6 +71,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -135,6 +137,19 @@ class MainActivity : ComponentActivity() {
                 val currentSong by musicViewModel.currentSong.collectAsState()
                 val isPlaying by musicViewModel.isPlaying.collectAsState()
 
+                // Universal BackHandler for all device types and navigation modes
+                BackHandler(enabled = drawerState.isOpen || isCommentsOpen || isPosterOpen || currentTab != "foryou") {
+                    if (drawerState.isOpen) {
+                        coroutineScope.launch { drawerState.close() }
+                    } else if (isCommentsOpen) {
+                        musicViewModel.setCommentsSheetOpen(false)
+                    } else if (isPosterOpen) {
+                        musicViewModel.closeLyricPosterDialog()
+                    } else if (currentTab != "foryou") {
+                        currentTab = "foryou"
+                    }
+                }
+
                 ModalNavigationDrawer(
                     drawerState = drawerState,
                     gesturesEnabled = true,
@@ -179,7 +194,7 @@ class MainActivity : ComponentActivity() {
                                     NavigationBar(
                                         containerColor = RessoBackground.copy(alpha = 0.95f),
                                         contentColor = Color.White,
-                                        modifier = Modifier.navigationBarsPadding().testTag("main_bottom_nav_bar")
+                                        modifier = Modifier.testTag("main_bottom_nav_bar")
                                     ) {
                                         NavigationBarItem(
                                             selected = currentTab == "foryou",
@@ -369,13 +384,15 @@ fun MiniPlayerBar(
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
                     fontSize = 13.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
                 Text(
                     text = artist,
                     color = RessoTextSecondary,
                     fontSize = 11.sp,
-                    maxLines = 1
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
 

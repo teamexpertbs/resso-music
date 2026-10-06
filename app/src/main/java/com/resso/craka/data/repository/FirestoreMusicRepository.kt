@@ -73,6 +73,13 @@ class FirestoreMusicRepository(
                         val id = doc.getString("id") ?: doc.id
                         val audioUrl = doc.getString("audioUrl") ?: ""
                         if (audioUrl.startsWith("http") && id !in excludeIds) {
+                            val art = doc.getString("albumArtUrl")
+                                ?: doc.getString("albumArt")
+                                ?: doc.getString("imageUrl")
+                                ?: doc.getString("image")
+                                ?: doc.getString("thumbnail")
+                                ?: doc.getString("cover")
+                                ?: ""
                             val candidate = SongEntity(
                                 id = id,
                                 title = doc.getString("title") ?: "Unknown Track",
@@ -80,7 +87,7 @@ class FirestoreMusicRepository(
                                 album = doc.getString("album") ?: "Single",
                                 durationMs = doc.getLong("durationMs") ?: 210000L,
                                 audioUrl = audioUrl,
-                                albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                                albumArtUrl = art,
                                 lyricsLrc = doc.getString("lyricsLrc") ?: "",
                                 genre = doc.getString("genre") ?: "Bollywood",
                                 mood = doc.getString("mood") ?: "Chill"
@@ -125,6 +132,13 @@ class FirestoreMusicRepository(
                         val audioUrl = doc.getString("audioUrl") ?: ""
                         val title = doc.getString("title") ?: ""
                         if (audioUrl.isNotBlank() && title.isNotBlank()) {
+                            val art = doc.getString("albumArtUrl")
+                                ?: doc.getString("albumArt")
+                                ?: doc.getString("imageUrl")
+                                ?: doc.getString("image")
+                                ?: doc.getString("thumbnail")
+                                ?: doc.getString("cover")
+                                ?: ""
                             SongEntity(
                                 id = id,
                                 title = title,
@@ -132,7 +146,7 @@ class FirestoreMusicRepository(
                                 album = doc.getString("album") ?: "Single",
                                 durationMs = doc.getLong("durationMs") ?: 210000L,
                                 audioUrl = audioUrl,
-                                albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                                albumArtUrl = art,
                                 lyricsLrc = doc.getString("lyricsLrc") ?: "",
                                 genre = doc.getString("genre") ?: "Bollywood",
                                 mood = doc.getString("mood") ?: "Chill"

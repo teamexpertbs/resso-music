@@ -265,9 +265,15 @@ class MusicSearchService {
                     moreInfo?.optString("album").orEmpty()
                 }.ifBlank { "Single" }
 
-                val img = (item.optString("image").ifBlank {
+                val rawImg = (item.optString("image").ifBlank {
                     moreInfo?.optString("image").orEmpty()
-                }).replace("150x150.jpg", "500x500.jpg")
+                }).trim()
+                val img = when {
+                    rawImg.isBlank() -> ""
+                    rawImg.startsWith("http://") -> "https://" + rawImg.removePrefix("http://")
+                    rawImg.startsWith("//") -> "https:$rawImg"
+                    else -> rawImg
+                }.replace("150x150.jpg", "500x500.jpg")
 
                 val rawDuration = item.optString("duration").ifBlank {
                     moreInfo?.optString("duration").orEmpty()

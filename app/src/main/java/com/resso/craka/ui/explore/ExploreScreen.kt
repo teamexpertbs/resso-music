@@ -1,5 +1,6 @@
 package com.resso.craka.ui.explore
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -7,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -184,6 +186,10 @@ fun ExploreScreen(
 
     val moods = listOf("All", "Chill", "Party", "Focus", "Romance", "Workout")
 
+    BackHandler(enabled = searchKeyword.isNotBlank()) {
+        searchKeyword = ""
+    }
+
     Column(
         modifier = modifier
             .fillMaxSize()
@@ -257,37 +263,29 @@ fun ExploreScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(top = 6.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
+                    .padding(top = 4.dp, bottom = 4.dp, start = 4.dp, end = 4.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Box(
                         modifier = Modifier
-                            .size(8.dp)
+                            .size(6.dp)
                             .clip(CircleShape)
-                            .background(if (firestoreSearchResults.isNotEmpty()) Color(0xFF00E676) else RessoPrimary)
+                            .background(RessoPrimary)
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = if (firestoreSearchResults.isNotEmpty()) {
-                            "🔥 Firestore Live: ${firestoreSearchResults.size} metadata matches"
-                        } else if (isFirestoreSearching) {
-                            "🔥 Querying Firestore in real-time..."
+                        text = if (isSearching || isFirestoreSearching) {
+                            "Searching online catalog..."
                         } else {
-                            "🔥 Firestore Cloud Search Active"
+                            "Search Results"
                         },
                         fontSize = 11.sp,
-                        color = if (firestoreSearchResults.isNotEmpty()) Color(0xFF00E676) else RessoPrimary,
-                        fontWeight = FontWeight.SemiBold
+                        color = RessoTextSecondary,
+                        fontWeight = FontWeight.Medium
                     )
                 }
-                Text(
-                    text = "Live Sync",
-                    fontSize = 10.sp,
-                    color = RessoTextSecondary,
-                    fontWeight = FontWeight.Medium
-                )
             }
         }
 
@@ -296,6 +294,7 @@ fun ExploreScreen(
         // Single Unified Scrollable LazyColumn - everything scrolls smoothly together!
         LazyColumn(
             state = listState,
+            contentPadding = PaddingValues(bottom = 28.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp),
             modifier = Modifier
                 .fillMaxSize()
@@ -778,14 +777,14 @@ fun SongListItem(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(6.dp))
-                            .background(Color(0xFFFF9100).copy(alpha = 0.22f))
+                            .background(Color(0xFF00E676).copy(alpha = 0.15f))
                             .padding(horizontal = 6.dp, vertical = 2.dp)
                     ) {
                         Text(
-                            text = "🔥 Firestore Live",
-                            color = Color(0xFFFFB300),
+                            text = "Cloud",
+                            color = Color(0xFF00E676),
                             fontSize = 10.sp,
-                            fontWeight = FontWeight.Bold
+                            fontWeight = FontWeight.SemiBold
                         )
                     }
                 } else if (song.id.startsWith("yt_")) {

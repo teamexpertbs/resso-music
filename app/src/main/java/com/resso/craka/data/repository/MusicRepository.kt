@@ -297,9 +297,6 @@ class MusicRepository(context: Context) {
     }
 
     private suspend fun seedInitialDataIfEmpty() {
-        val count = songDao.getSongCount()
-        if (count >= 5) return
-
         val sampleSongs = listOf(
             SongEntity(
                 id = "saavn_payal",
@@ -308,7 +305,7 @@ class MusicRepository(context: Context) {
                 album = "GLORY",
                 durationMs = 221000L,
                 audioUrl = "https://aac.saavncdn.com/173/ad5df053bfb2a4755cbb6c74e6183406_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20240826144815-500x500.jpg",
+                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg",
                 lyricsLrc = """
                     [00:00.00] (Yo Yo Honey Singh! Paradox!)
                     [00:05.00] Chhan chhan chhan chhan baaje payal
@@ -331,7 +328,7 @@ class MusicRepository(context: Context) {
                 album = "Bad Newz",
                 durationMs = 208000L,
                 audioUrl = "https://aac.saavncdn.com/992/5d44da8bc1d78fb72d18b701d758fd1f_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/992/Bad-Newz-Hindi-2024-20240709080001-500x500.jpg",
+                albumArtUrl = "https://c.saavncdn.com/992/Bad-Newz-Hindi-2024-20250730113701-500x500.jpg",
                 lyricsLrc = """
                     [00:00.00] (Yeah, Karan Aujla!)
                     [00:06.00] Husan tera tauba tauba
@@ -351,7 +348,7 @@ class MusicRepository(context: Context) {
                 album = "Stree 2",
                 durationMs = 228000L,
                 audioUrl = "https://aac.saavncdn.com/373/36b1b3637cdeedfaa9a9012453948aa6_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/373/Stree-2-Hindi-2024-20240827150130-500x500.jpg",
+                albumArtUrl = "https://c.saavncdn.com/373/Stree-2-Hindi-2024-20240828083834-500x500.jpg",
                 lyricsLrc = """
                     [00:00.00] (Thumping Dance Beats)
                     [00:06.00] Aaj ki raat maza husn ka aankhon se lijiye
@@ -370,7 +367,7 @@ class MusicRepository(context: Context) {
                 album = "Brahmastra",
                 durationMs = 268000L,
                 audioUrl = "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/871/Brahmastra-Hindi-2022-20220717092820-500x500.jpg",
+                albumArtUrl = "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
                 lyricsLrc = """
                     [00:00.00] (Romantic Flute & Acoustic Intro)
                     [00:06.00] Mujhko itna bataye koi
@@ -393,7 +390,7 @@ class MusicRepository(context: Context) {
                 album = "GLORY",
                 durationMs = 200000L,
                 audioUrl = "https://aac.saavncdn.com/173/4528cbe9b2ceba863a8e2e92c2da2882_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20240826144815-500x500.jpg",
+                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg",
                 lyricsLrc = """
                     [00:00.00] (Yo Yo Honey Singh!)
                     [00:05.00] Main ban gaya millionaire

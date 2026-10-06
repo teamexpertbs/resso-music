@@ -66,11 +66,12 @@ fun AlbumArtwork(
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
                     .data(url)
-                    .crossfade(180)
-                    .allowHardware(true)
+                    .crossfade(250)
+                    .allowHardware(false)
                     .diskCachePolicy(CachePolicy.ENABLED)
                     .memoryCachePolicy(CachePolicy.ENABLED)
                     .networkCachePolicy(CachePolicy.ENABLED)
+                    .setHeader("User-Agent", "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36")
                     .build(),
                 contentDescription = contentDescription,
                 contentScale = contentScale,

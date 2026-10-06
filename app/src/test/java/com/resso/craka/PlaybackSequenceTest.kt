@@ -140,4 +140,42 @@ class PlaybackSequenceTest {
         assertEquals("Kesariya", deduplicated[2].title)
         assertEquals("Millionaire", deduplicated[3].title)
     }
+
+    @Test
+    fun testBeatDetectionKickTransient() {
+        var beatCount = 0
+        val processor = com.resso.craka.player.BeatDetectionAudioProcessor {
+            beatCount++
+        }
+        processor.isEnabled = true
+
+        val format = androidx.media3.common.audio.AudioProcessor.AudioFormat(
+            44100,
+            2,
+            androidx.media3.common.C.ENCODING_PCM_16BIT
+        )
+        processor.configure(format)
+        processor.flush()
+
+        // 1. Initial baseline buffer (silence)
+        val silence = java.nio.ByteBuffer.allocateDirect(1024 * 2 * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        for (i in 0 until 1024) {
+            silence.putShort(0)
+            silence.putShort(0)
+        }
+        silence.flip()
+        processor.queueInput(silence)
+
+        // 2. High-energy 60Hz kick transient
+        val kick = java.nio.ByteBuffer.allocateDirect(2048 * 2 * 2).order(java.nio.ByteOrder.LITTLE_ENDIAN)
+        for (i in 0 until 2048) {
+            val sample = (kotlin.math.sin(2.0 * Math.PI * 60.0 * i / 44100.0) * 28000.0).toInt().toShort()
+            kick.putShort(sample)
+            kick.putShort(sample)
+        }
+        kick.flip()
+        processor.queueInput(kick)
+
+        org.junit.Assert.assertTrue("Beat detector should identify kick drum transient", beatCount >= 1)
+    }
 }
