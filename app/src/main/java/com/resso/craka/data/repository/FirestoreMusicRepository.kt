@@ -72,21 +72,22 @@ class FirestoreMusicRepository(
                     for (doc in snapshot.documents) {
                         val id = doc.getString("id") ?: doc.id
                         val audioUrl = doc.getString("audioUrl") ?: ""
-                        if (audioUrl.startsWith("http") && id !in excludeIds && result.none { it.id == id }) {
-                            result.add(
-                                SongEntity(
-                                    id = id,
-                                    title = doc.getString("title") ?: "Unknown Track",
-                                    artist = doc.getString("artist") ?: "Various Artists",
-                                    album = doc.getString("album") ?: "Single",
-                                    durationMs = doc.getLong("durationMs") ?: 210000L,
-                                    audioUrl = audioUrl,
-                                    albumArtUrl = doc.getString("albumArtUrl") ?: "",
-                                    lyricsLrc = doc.getString("lyricsLrc") ?: "",
-                                    genre = doc.getString("genre") ?: "Bollywood",
-                                    mood = doc.getString("mood") ?: "Chill"
-                                )
+                        if (audioUrl.startsWith("http") && id !in excludeIds) {
+                            val candidate = SongEntity(
+                                id = id,
+                                title = doc.getString("title") ?: "Unknown Track",
+                                artist = doc.getString("artist") ?: "Various Artists",
+                                album = doc.getString("album") ?: "Single",
+                                durationMs = doc.getLong("durationMs") ?: 210000L,
+                                audioUrl = audioUrl,
+                                albumArtUrl = doc.getString("albumArtUrl") ?: "",
+                                lyricsLrc = doc.getString("lyricsLrc") ?: "",
+                                genre = doc.getString("genre") ?: "Bollywood",
+                                mood = doc.getString("mood") ?: "Chill"
                             )
+                            if (result.none { com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(it, candidate) }) {
+                                result.add(candidate)
+                            }
                         }
                         if (result.size >= limit) break
                     }
@@ -137,7 +138,7 @@ class FirestoreMusicRepository(
                                 mood = doc.getString("mood") ?: "Chill"
                             )
                         } else null
-                    }.shuffled().take(limit)
+                    }.let { com.resso.craka.util.SongDeduplicator.deduplicateList(it) }.shuffled().take(limit)
 
                     if (list.isNotEmpty()) {
                         trySend(list)

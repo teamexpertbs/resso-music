@@ -1,12 +1,15 @@
 package com.resso.craka.player
 
 import com.resso.craka.data.model.SongEntity
+import com.resso.craka.util.SongDeduplicator
+import com.resso.craka.util.deduplicate
 import kotlin.random.Random
 
 /**
  * Dedicated Shuffle Algorithm for music playback.
  * Implements Fisher-Yates permutation and dynamic index randomization
  * whenever a new song is fetched or when the user clicks 'next'.
+ * Enforces canonical deduplication so songs never repeat or play duplicate variations.
  */
 class PlaybackShuffleEngine {
 
@@ -28,18 +31,21 @@ class PlaybackShuffleEngine {
 
     /**
      * Randomizes the queue and calculates a new random index
-     * whenever new songs are fetched or added to the queue.
+     * whenever new songs are fetched or added to the queue,
+     * ensuring no duplicate tracks exist in the resulting queue.
      */
     fun onNewSongsFetched(
         currentQueue: List<SongEntity>,
         newSongs: List<SongEntity>,
         currentSongId: String?
     ): Pair<List<SongEntity>, Int> {
-        val combined = (currentQueue + newSongs).distinctBy { it.id }
+        val combined = (currentQueue + newSongs).deduplicate()
         if (combined.isEmpty()) return emptyList<SongEntity>() to 0
 
         val currentSong = combined.firstOrNull { it.id == currentSongId }
-        val otherSongs = combined.filter { it.id != currentSongId }
+        val otherSongs = combined.filter {
+            if (currentSong != null) !SongDeduplicator.isSameOrDuplicate(it, currentSong) else it.id != currentSongId
+        }
 
         // Fisher-Yates shuffle the rest of the queue
         val shuffledOthers = shuffleList(otherSongs)
@@ -63,23 +69,30 @@ class PlaybackShuffleEngine {
 
     /**
      * Computes the next randomized index when the user clicks 'next',
-     * prioritizing unplayed songs and randomizing the queue index.
+     * prioritizing unplayed songs and strictly filtering out any duplicate variations of played tracks.
      */
     fun selectNextRandomIndex(
         queue: List<SongEntity>,
         currentSongId: String?,
-        playedHistoryIds: Set<String>
+        playedHistoryIds: Set<String>,
+        playedHistoryKeys: Set<String> = emptySet()
     ): Pair<SongEntity?, Int> {
         if (queue.isEmpty()) return null to -1
 
-        // Filter unplayed candidates
-        val unplayedCandidates = queue.filter { it.id != currentSongId && it.id !in playedHistoryIds }
+        val currentSong = queue.firstOrNull { it.id == currentSongId }
+
+        // Filter unplayed candidates: exclude current song and any already played IDs or canonical keys
+        val unplayedCandidates = queue.filter { song ->
+            !SongDeduplicator.isSameOrDuplicate(song, currentSong) &&
+                song.id !in playedHistoryIds &&
+                SongDeduplicator.canonicalKey(song) !in playedHistoryKeys
+        }
 
         val selectedSong = if (unplayedCandidates.isNotEmpty()) {
             val randomIndex = random.nextInt(unplayedCandidates.size)
             unplayedCandidates[randomIndex]
         } else {
-            val remaining = queue.filter { it.id != currentSongId }
+            val remaining = queue.filter { !SongDeduplicator.isSameOrDuplicate(it, currentSong) }
             if (remaining.isNotEmpty()) {
                 val randomIndex = random.nextInt(remaining.size)
                 remaining[randomIndex]
@@ -94,3 +107,4 @@ class PlaybackShuffleEngine {
         return selectedSong to finalIndex
     }
 }
+

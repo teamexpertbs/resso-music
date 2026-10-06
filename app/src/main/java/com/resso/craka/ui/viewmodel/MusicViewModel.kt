@@ -34,6 +34,8 @@ import com.resso.craka.flash.FlashSyncManager
 import com.resso.craka.player.AppEqualizer
 import com.resso.craka.player.StreamPlayerManager
 import com.resso.craka.util.LyricsParser
+import com.resso.craka.util.SongDeduplicator
+import com.resso.craka.util.deduplicate
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.withContext
@@ -121,6 +123,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val playerPrefs = application.getSharedPreferences("player_prefs", Context.MODE_PRIVATE)
     private val playedHistoryIds = java.util.Collections.synchronizedSet(
         LinkedHashSet(playerPrefs.getStringSet("played_history_ids", emptySet()) ?: emptySet())
+    )
+    private val playedHistoryKeys = java.util.Collections.synchronizedSet(
+        LinkedHashSet(playerPrefs.getStringSet("played_history_keys", emptySet()) ?: emptySet())
     )
     private val playbackBackStack = java.util.ArrayDeque<SongEntity>()
     private val playbackForwardStack = java.util.ArrayDeque<SongEntity>()
@@ -414,9 +419,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     }
 
                     // Seamless Crossfade & DJ Transition in last 3.5s
-                    if (_isCrossfadeEnabled.value && _isPlaying.value && _durationMs.value > 15_000L && !isCrossfading) {
+                    if (_isCrossfadeEnabled.value && _isPlaying.value && _durationMs.value > 15_000L && !isCrossfading && !crossfadeTriggeredForCurrentSong) {
                         val remainingMs = _durationMs.value - streamPos
                         if (remainingMs in 500L..3500L) {
+                            crossfadeTriggeredForCurrentSong = true
                             triggerCrossfade()
                         }
                     }
@@ -435,6 +441,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun handleSongEnded() {
+        if (isCrossfading) {
+            // Already transitioning smoothly via crossfade
+            return
+        }
         if (_repeatMode.value == 2) {
             restartCurrentSong()
         } else {
@@ -499,19 +509,21 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun restoreLastPlaybackOrInitial(trendingList: List<SongEntity>) {
         if (_currentSong.value != null) return
         viewModelScope.launch {
-            val pool = (trendingList + _trendingSongs.value + allSongs.value).distinctBy { it.id }
+            val pool = (trendingList + _trendingSongs.value + allSongs.value).deduplicate()
             if (pool.isEmpty()) return@launch
 
             // Always pick a brand new song that has not been heard yet in previous sessions!
-            val unplayed = pool.filter { it.id !in playedHistoryIds }
+            val unplayed = pool.filter { 
+                it.id !in playedHistoryIds && SongDeduplicator.canonicalKey(it) !in playedHistoryKeys 
+            }
             val songToSelect = unplayed.shuffled().firstOrNull()
                 ?: pool.shuffled().firstOrNull()
                 ?: pool.first()
 
             if (_currentSong.value == null) {
-                val randomizedQueue = (listOf(songToSelect) + pool.filter { it.id != songToSelect.id }.shuffled()).distinctBy { it.id }
+                val otherPool = pool.filter { !SongDeduplicator.isSameOrDuplicate(it, songToSelect) }.shuffled()
+                val randomizedQueue = (listOf(songToSelect) + otherPool).deduplicate()
                 selectSong(songToSelect, 0, autoPlay = false, queue = randomizedQueue)
-                ensureAutoplayRadioBuffer(songToSelect)
             }
         }
     }
@@ -763,10 +775,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val currentQueue = playbackQueue.value
         val effectiveQueue = when {
             queue != null && queue.isNotEmpty() -> queue
-            currentQueue.any { it.id == song.id } -> currentQueue
+            currentQueue.any { SongDeduplicator.isSameOrDuplicate(it, song) } -> currentQueue
             currentQueue.isNotEmpty() -> listOf(song) + currentQueue
-            else -> listOf(song) + (_trendingSongs.value + allSongs.value).filter { it.id != song.id }
-        }.distinctBy { it.id }
+            else -> listOf(song) + (_trendingSongs.value + allSongs.value)
+        }.deduplicate()
 
         playbackQueue.value = effectiveQueue
 
@@ -777,9 +789,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 playbackForwardStack.clear()
             }
             val prev = _currentSong.value
-            if (prev != null && prev.id != song.id) {
+            if (prev != null && !SongDeduplicator.isSameOrDuplicate(prev, song)) {
                 synchronized(playbackBackStack) {
-                    if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != prev.id) {
+                    if (playbackBackStack.isEmpty() || !SongDeduplicator.isSameOrDuplicate(playbackBackStack.peekLast(), prev)) {
                         playbackBackStack.addLast(prev)
                         if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
                     }
@@ -788,18 +800,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         _currentSong.value = song
-        _currentSongIndex.value = effectiveQueue.indexOfFirst { it.id == song.id }.coerceAtLeast(0)
+        _currentSongIndex.value = effectiveQueue.indexOfFirst { SongDeduplicator.isSameOrDuplicate(it, song) }.coerceAtLeast(0)
         crossfadeTriggeredForCurrentSong = false
 
         // Anti-repeat session memory (never repeats in current or future sessions)
+        val canonicalKey = SongDeduplicator.canonicalKey(song)
         synchronized(playedHistoryIds) {
             playedHistoryIds.add(song.id)
+            if (canonicalKey.isNotEmpty()) {
+                playedHistoryKeys.add(canonicalKey)
+            }
             if (playedHistoryIds.size > 250) {
                 val toRemove = playedHistoryIds.take(50).toSet()
                 playedHistoryIds.removeAll(toRemove)
             }
+            if (playedHistoryKeys.size > 250) {
+                val toRemove = playedHistoryKeys.take(50).toSet()
+                playedHistoryKeys.removeAll(toRemove)
+            }
             playerPrefs.edit()
                 .putStringSet("played_history_ids", java.util.HashSet(playedHistoryIds))
+                .putStringSet("played_history_keys", java.util.HashSet(playedHistoryKeys))
                 .apply()
         }
 
@@ -969,8 +990,9 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun playNextSong() {
-        val queue = playbackQueue.value
-        if (queue.isEmpty()) return
+        val rawQueue = playbackQueue.value
+        if (rawQueue.isEmpty()) return
+        val queue = rawQueue.deduplicate()
 
         val currentSong = _currentSong.value
 
@@ -988,13 +1010,13 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             try {
                 if (currentSong != null) {
                     synchronized(playbackBackStack) {
-                        if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != currentSong.id) {
+                        if (playbackBackStack.isEmpty() || !SongDeduplicator.isSameOrDuplicate(playbackBackStack.peekLast(), currentSong)) {
                             playbackBackStack.addLast(currentSong)
                             if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
                         }
                     }
                 }
-                val targetIndex = queue.indexOfFirst { it.id == forwardSong.id }.let { if (it >= 0) it else 0 }
+                val targetIndex = queue.indexOfFirst { SongDeduplicator.isSameOrDuplicate(it, forwardSong) }.let { if (it >= 0) it else 0 }
                 selectSong(forwardSong, targetIndex, autoPlay = true)
                 ensureAutoplayRadioBuffer(forwardSong)
             } finally {
@@ -1004,25 +1026,28 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
 
         // 2. Compute candidate track based on current queue and mode
-        val currentId = currentSong?.id
-        val currentIndex = queue.indexOfFirst { it.id == currentId }
+        val currentIndex = queue.indexOfFirst { SongDeduplicator.isSameOrDuplicate(it, currentSong) }
 
         val candidate: SongEntity?
         val targetIndex: Int
 
         if (_isShuffle.value) {
-            // Shuffle mode: pick an unplayed track if available, or any other track
-            val unplayed = queue.filter { it.id != currentId && it.id !in playedHistoryIds }
+            // Shuffle mode: pick an unplayed track if available, or any other non-duplicate track
+            val unplayed = queue.filter { 
+                !SongDeduplicator.isSameOrDuplicate(it, currentSong) && 
+                    it.id !in playedHistoryIds && 
+                    SongDeduplicator.canonicalKey(it) !in playedHistoryKeys 
+            }
             val chosen = if (unplayed.isNotEmpty()) {
                 unplayed.random()
             } else {
-                val others = queue.filter { it.id != currentId }
+                val others = queue.filter { !SongDeduplicator.isSameOrDuplicate(it, currentSong) }
                 if (others.isNotEmpty()) others.random() else queue.firstOrNull()
             }
             candidate = chosen
             targetIndex = if (candidate != null) queue.indexOfFirst { it.id == candidate.id }.coerceAtLeast(0) else 0
         } else {
-            // Normal sequential mode: deterministic track progression
+            // Normal sequential mode: deterministic track progression with zero duplicates
             if (currentIndex >= 0 && currentIndex + 1 < queue.size) {
                 targetIndex = currentIndex + 1
                 candidate = queue[targetIndex]
@@ -1032,11 +1057,16 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 candidate = queue[0]
             } else {
                 // Repeat Off and at end of queue:
-                val trending = _trendingSongs.value
-                val existingIds = queue.map { it.id }.toSet()
-                val nextTrending = trending.firstOrNull { it.id !in existingIds }
+                val trending = _trendingSongs.value.deduplicate()
+                val existingKeys = queue.map { SongDeduplicator.canonicalKey(it) }.toSet()
+                val nextTrending = trending.firstOrNull { 
+                    SongDeduplicator.canonicalKey(it) !in existingKeys && 
+                        SongDeduplicator.canonicalKey(it) !in playedHistoryKeys &&
+                        !SongDeduplicator.isSameOrDuplicate(it, currentSong)
+                } ?: trending.firstOrNull { !SongDeduplicator.isSameOrDuplicate(it, currentSong) }
+
                 if (nextTrending != null) {
-                    playbackQueue.value = queue + nextTrending
+                    playbackQueue.value = (queue + nextTrending).deduplicate()
                     targetIndex = queue.size
                     candidate = nextTrending
                 } else if (queue.isNotEmpty() && _repeatMode.value != 0) {
@@ -1044,23 +1074,32 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     candidate = queue[0]
                 } else {
                     targetIndex = 0
-                    candidate = null
+                    candidate = queue.firstOrNull { !SongDeduplicator.isSameOrDuplicate(it, currentSong) } ?: queue.firstOrNull()
                 }
             }
         }
 
         // Proactive replenishment buffer if nearing end of queue
-        val unplayedRemaining = queue.count { it.id != currentId && it.id !in playedHistoryIds }
+        val unplayedRemaining = queue.count { 
+            !SongDeduplicator.isSameOrDuplicate(it, currentSong) && 
+                it.id !in playedHistoryIds && 
+                SongDeduplicator.canonicalKey(it) !in playedHistoryKeys 
+        }
         if (unplayedRemaining <= 3) {
             viewModelScope.launch(Dispatchers.IO) {
                 try {
-                    val freshSongs = repository.getTrendingSongs()
+                    val freshSongs = repository.getTrendingSongs().deduplicate()
                     if (freshSongs.isNotEmpty()) {
                         withContext(Dispatchers.Main) {
-                            val existingIds = playbackQueue.value.map { it.id }.toSet()
-                            val newTracks = freshSongs.filter { it.id !in existingIds }
+                            val currentQ = playbackQueue.value
+                            val existingKeys = currentQ.map { SongDeduplicator.canonicalKey(it) }.toSet()
+                            val newTracks = freshSongs.filter { 
+                                it.id !in playedHistoryIds && 
+                                    SongDeduplicator.canonicalKey(it) !in existingKeys && 
+                                    SongDeduplicator.canonicalKey(it) !in playedHistoryKeys 
+                            }
                             if (newTracks.isNotEmpty()) {
-                                playbackQueue.value = playbackQueue.value + newTracks
+                                playbackQueue.value = (currentQ + newTracks).deduplicate()
                             }
                         }
                     }
@@ -1071,7 +1110,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         if (candidate != null) {
             if (currentSong != null) {
                 synchronized(playbackBackStack) {
-                    if (playbackBackStack.isEmpty() || playbackBackStack.peekLast()?.id != currentSong.id) {
+                    if (playbackBackStack.isEmpty() || !SongDeduplicator.isSameOrDuplicate(playbackBackStack.peekLast(), currentSong)) {
                         playbackBackStack.addLast(currentSong)
                         if (playbackBackStack.size > 50) playbackBackStack.removeFirst()
                     }
@@ -1619,55 +1658,67 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         autoplayJob?.cancel()
         autoplayJob = viewModelScope.launch(Dispatchers.IO) {
             try {
-                val currentQueueList = playbackQueue.value
+                val currentQueueList = playbackQueue.value.deduplicate()
                 val existingIds = currentQueueList.map { it.id }.toSet()
-                val currentSongIndex = currentQueueList.indexOfFirst { it.id == currentSong.id }
+                val existingKeys = currentQueueList.map { SongDeduplicator.canonicalKey(it) }.toSet()
+                val currentKey = SongDeduplicator.canonicalKey(currentSong)
+                val currentSongIndex = currentQueueList.indexOfFirst { SongDeduplicator.isSameOrDuplicate(it, currentSong) }
 
                 val remainingCount = if (currentSongIndex >= 0) currentQueueList.size - currentSongIndex - 1 else 0
                 if (remainingCount >= 6) return@launch
 
                 val newTracks = mutableListOf<SongEntity>()
 
+                fun isEligible(track: SongEntity): Boolean {
+                    if (SongDeduplicator.isSameOrDuplicate(track, currentSong)) return false
+                    val key = SongDeduplicator.canonicalKey(track)
+                    if (key == currentKey || key in existingKeys || key in playedHistoryKeys) return false
+                    if (track.id in existingIds || track.id == currentSong.id || track.id in playedHistoryIds) return false
+                    if (newTracks.any { SongDeduplicator.isSameOrDuplicate(it, track) }) return false
+                    return true
+                }
+
+                // 1. Up to 2 songs from the current artist (never flood with the same artist)
                 val cleanArtist = currentSong.artist
                     .replace(Regex("(?i)ft\\.?|feat\\.?|&|,|official|audio|video|vevo|remix|mix"), " ")
                     .trim()
                 if (cleanArtist.isNotBlank() && cleanArtist.length >= 3 && !cleanArtist.contains("unknown", ignoreCase = true)) {
-                    val artistTracks = repository.searchSongsOnline("$cleanArtist hits")
+                    val artistTracks = repository.searchSongsOnline("$cleanArtist hits").deduplicate()
                     for (track in artistTracks) {
-                        if (track.id !in existingIds && track.id != currentSong.id && track.id !in playedHistoryIds && newTracks.none { it.id == track.id }) {
+                        if (isEligible(track)) {
                             newTracks.add(track)
-                            if (newTracks.size >= 5) break
+                            if (newTracks.size >= 2) break
                         }
                     }
                 }
 
-                if (newTracks.size < 5) {
-                    val radioSeeds = listOf(
-                        "Trending Hindi Hits",
-                        "Top Punjabi Hits",
-                        "Bollywood Romantic Hits",
-                        "Arijit Singh Hits",
-                        "Superhit Bollywood Songs",
-                        "Latest Bollywood Songs",
-                        "Party Dance Hindi"
-                    ).shuffled()
+                // 2. Varied radio seeds for diverse genres and artists
+                val radioSeeds = listOf(
+                    "Trending Hindi Hits",
+                    "Top Punjabi Hits",
+                    "Bollywood Romantic Hits",
+                    "Arijit Singh Hits",
+                    "Superhit Bollywood Songs",
+                    "Latest Bollywood Songs",
+                    "Party Dance Hindi"
+                ).shuffled()
 
-                    for (seed in radioSeeds) {
-                        if (newTracks.size >= 6) break
-                        val seedTracks = repository.searchSongsOnline(seed)
-                        for (track in seedTracks) {
-                            if (track.id !in existingIds && track.id != currentSong.id && track.id !in playedHistoryIds && newTracks.none { it.id == track.id }) {
-                                newTracks.add(track)
-                                if (newTracks.size >= 6) break
-                            }
+                for (seed in radioSeeds) {
+                    if (newTracks.size >= 6) break
+                    val seedTracks = repository.searchSongsOnline(seed).deduplicate()
+                    for (track in seedTracks) {
+                        if (isEligible(track)) {
+                            newTracks.add(track)
+                            if (newTracks.size >= 6) break
                         }
                     }
                 }
 
+                // 3. Trending fallback
                 if (newTracks.size < 4) {
-                    val trending = if (_trendingSongs.value.isNotEmpty()) _trendingSongs.value else repository.getTrendingSongs()
+                    val trending = if (_trendingSongs.value.isNotEmpty()) _trendingSongs.value.deduplicate() else repository.getTrendingSongs().deduplicate()
                     for (track in trending) {
-                        if (track.id !in existingIds && track.id != currentSong.id && track.id !in playedHistoryIds && newTracks.none { it.id == track.id }) {
+                        if (isEligible(track)) {
                             newTracks.add(track)
                             if (newTracks.size >= 6) break
                         }
@@ -1677,11 +1728,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (newTracks.isNotEmpty()) {
                     withContext(Dispatchers.Main) {
                         val currentQueue = playbackQueue.value
-                        val existingQueueIds = currentQueue.map { it.id }.toSet()
-                        val distinctNew = newTracks.filter { it.id !in existingQueueIds }
-                        if (distinctNew.isNotEmpty()) {
-                            playbackQueue.value = currentQueue + distinctNew
-                        }
+                        val updated = (currentQueue + newTracks).deduplicate()
+                        playbackQueue.value = updated
                     }
                 }
             } catch (e: Exception) {

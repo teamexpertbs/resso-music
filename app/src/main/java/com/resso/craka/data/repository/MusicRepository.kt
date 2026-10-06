@@ -102,15 +102,15 @@ class MusicRepository(context: Context) {
     // Online & Local Search
     suspend fun searchSongsOnline(query: String): List<SongEntity> {
         val key = "search_${query.trim().lowercase()}"
-        catalogCache.read(key, SEARCH_CACHE_MS)?.let { return it }
-        val fresh = searchService.searchSongs(query)
+        catalogCache.read(key, SEARCH_CACHE_MS)?.let { return com.resso.craka.util.SongDeduplicator.deduplicateList(it) }
+        val fresh = com.resso.craka.util.SongDeduplicator.deduplicateList(searchService.searchSongs(query))
         if (fresh.isNotEmpty()) catalogCache.write(key, fresh)
-        return fresh.ifEmpty { catalogCache.read(key, WEEK_MS).orEmpty() }
+        return fresh.ifEmpty { com.resso.craka.util.SongDeduplicator.deduplicateList(catalogCache.read(key, WEEK_MS).orEmpty()) }
     }
 
     suspend fun getTrendingSongs(): List<SongEntity> {
         try {
-            val fresh = searchService.getTrendingSongs(35)
+            val fresh = com.resso.craka.util.SongDeduplicator.deduplicateList(searchService.getTrendingSongs(35))
             if (fresh.isNotEmpty()) {
                 songDao.insertSongs(fresh)
                 firestoreMusicRepo.saveSongsBatch(fresh)
@@ -119,29 +119,29 @@ class MusicRepository(context: Context) {
         } catch (_: Exception) {}
 
         try {
-            val dynamicFirestore = firestoreMusicRepo.getDynamicSongs(30)
+            val dynamicFirestore = com.resso.craka.util.SongDeduplicator.deduplicateList(firestoreMusicRepo.getDynamicSongs(30))
             if (dynamicFirestore.isNotEmpty()) {
                 songDao.insertSongs(dynamicFirestore)
                 return dynamicFirestore.shuffled()
             }
         } catch (_: Exception) {}
 
-        return songDao.getInitialSongsSync().shuffled()
+        return com.resso.craka.util.SongDeduplicator.deduplicateList(songDao.getInitialSongsSync()).shuffled()
     }
 
     fun peekTrending(): List<SongEntity> = emptyList()
 
     fun peekSearch(query: String): List<SongEntity> {
         val key = "search_${query.trim().lowercase()}"
-        return catalogCache.read(key, WEEK_MS).orEmpty()
+        return com.resso.craka.util.SongDeduplicator.deduplicateList(catalogCache.read(key, WEEK_MS).orEmpty())
     }
 
     fun peekSearches(queries: List<String>): List<SongEntity> {
-        val merged = LinkedHashMap<String, SongEntity>()
+        val allSongs = mutableListOf<SongEntity>()
         queries.forEach { query ->
-            peekSearch(query).forEach { song -> merged.putIfAbsent(song.id, song) }
+            allSongs.addAll(peekSearch(query))
         }
-        return merged.values.toList()
+        return com.resso.craka.util.SongDeduplicator.deduplicateList(allSongs)
     }
     suspend fun searchLocalSongs(query: String): List<SongEntity> = songDao.searchLocalSongs(query)
     suspend fun fetchLyrics(artist: String, title: String): String? = searchService.fetchSyncedLyrics(artist, title)
@@ -204,11 +204,15 @@ class MusicRepository(context: Context) {
         return ids.mapNotNull { found[it] }
     }
 
-    fun recentSongs(): List<SongEntity> = catalogCache.read("recent_played", WEEK_MS).orEmpty()
+    fun recentSongs(): List<SongEntity> = com.resso.craka.util.SongDeduplicator.deduplicateList(
+        catalogCache.read("recent_played", WEEK_MS).orEmpty()
+    )
 
     fun rememberRecent(song: SongEntity) {
         if (!song.audioUrl.startsWith("http")) return
-        val next = listOf(song) + recentSongs().filter { it.id != song.id }
+        val next = com.resso.craka.util.SongDeduplicator.deduplicateList(
+            listOf(song) + recentSongs().filter { !com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(it, song) }
+        )
         catalogCache.write("recent_played", next.take(30))
         CoroutineScope(Dispatchers.IO).launch {
             firebaseManager.syncHistory(song)

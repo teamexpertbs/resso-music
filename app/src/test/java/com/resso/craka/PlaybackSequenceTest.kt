@@ -112,4 +112,32 @@ class PlaybackSequenceTest {
         }
         org.junit.Assert.assertTrue("Should find Love Dose", results.isNotEmpty())
     }
+
+    @Test
+    fun testSongDeduplicationPreventsReplayLoops() {
+        val song1 = createSong("saavn_tauba_tauba", "Tauba Tauba")
+        val song2 = createSong("saavn_998811", "Tauba Tauba (From \"Bad Newz\")")
+        val song3 = createSong("saavn_payal", "Payal")
+        val song4 = createSong("saavn_445566", "Payal (Glory)")
+        val song5 = createSong("saavn_kesariya", "Kesariya")
+        val song6 = createSong("saavn_112233", "Kesariya - Film Version")
+        val song7 = createSong("saavn_millionaire", "Millionaire")
+        val song8 = createSong("saavn_778899", "Millionaire (Glory)")
+
+        // Verify duplicates detection
+        org.junit.Assert.assertTrue(com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(song1, song2))
+        org.junit.Assert.assertTrue(com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(song3, song4))
+        org.junit.Assert.assertTrue(com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(song5, song6))
+        org.junit.Assert.assertTrue(com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(song7, song8))
+
+        // Verify that 8 songs with duplicates are correctly deduplicated into exactly 4 unique songs
+        val duplicateList = listOf(song1, song2, song3, song4, song5, song6, song7, song8)
+        val deduplicated = com.resso.craka.util.SongDeduplicator.deduplicateList(duplicateList)
+
+        assertEquals(4, deduplicated.size)
+        assertEquals("Tauba Tauba", deduplicated[0].title)
+        assertEquals("Payal", deduplicated[1].title)
+        assertEquals("Kesariya", deduplicated[2].title)
+        assertEquals("Millionaire", deduplicated[3].title)
+    }
 }
