@@ -17,8 +17,16 @@ import java.util.concurrent.TimeUnit
 class RessoApplication : Application(), ImageLoaderFactory {
     private val tag = "RessoApplication"
     
-    lateinit var repository: MusicRepository
-        private set
+    private var _repository: MusicRepository? = null
+    val repository: MusicRepository
+        get() {
+            var repo = _repository
+            if (repo == null) {
+                repo = MusicRepository(this)
+                _repository = repo
+            }
+            return repo
+        }
 
     override fun onCreate() {
         super.onCreate()
@@ -27,46 +35,42 @@ class RessoApplication : Application(), ImageLoaderFactory {
         try {
             Firebase.initialize(this)
             Log.i(tag, "Firebase initialized from google-services.json")
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             Log.w(tag, "Firebase initialization attempt: ${e.message}")
         }
         
         // Verify Firebase is ready and log configuration
-        FirebaseInitializer.initialize()
-        FirebaseInitializer.logConfiguration()
+        try {
+            FirebaseInitializer.initialize()
+            FirebaseInitializer.logConfiguration()
+        } catch (e: Throwable) {
+            Log.w(tag, "FirebaseInitializer: ${e.message}")
+        }
         
-        // Authenticate anonymously before starting the repository.
-        // Firestore rules can then use request.auth.uid safely.
-        val auth = FirebaseAuth.getInstance()
+        // CRITICAL: Pre-initialize repository immediately and synchronously!
+        try {
+            _repository = MusicRepository(this)
+            Log.i(tag, "MusicRepository pre-initialized synchronously")
+        } catch (t: Throwable) {
+            Log.e(tag, "Failed pre-initializing repository: ${t.message}", t)
+        }
 
-        if (auth.currentUser != null) {
-            Log.i(tag, "Firebase Auth already signed in: ${auth.currentUser?.uid}")
-            repository = MusicRepository(this)
-            Log.i(tag, "RessoApplication onCreate complete. Firebase ready: ${FirebaseInitializer.isReady()}")
-        } else {
-            auth.signInAnonymously()
-                .addOnSuccessListener { result ->
-                    Log.i(tag, "Anonymous Firebase Auth successful: ${result.user?.uid}")
-
-                    // Start repository only after authentication succeeds.
-                    repository = MusicRepository(this)
-
-                    Log.i(
-                        tag,
-                        "RessoApplication onCreate complete. Firebase ready: ${FirebaseInitializer.isReady()}"
-                    )
-                }
-                .addOnFailureListener { error ->
-                    Log.e(tag, "Anonymous Firebase Auth failed: ${error.message}", error)
-
-                    // Keep the app usable even if Auth is temporarily unavailable.
-                    repository = MusicRepository(this)
-
-                    Log.i(
-                        tag,
-                        "RessoApplication started without authenticated Firestore access"
-                    )
-                }
+        // Authenticate anonymously in the background for Firestore access
+        try {
+            val auth = FirebaseAuth.getInstance()
+            if (auth.currentUser != null) {
+                Log.i(tag, "Firebase Auth already signed in: ${auth.currentUser?.uid}")
+            } else {
+                auth.signInAnonymously()
+                    .addOnSuccessListener { result ->
+                        Log.i(tag, "Anonymous Firebase Auth successful: ${result.user?.uid}")
+                    }
+                    .addOnFailureListener { error ->
+                        Log.w(tag, "Anonymous Firebase Auth non-fatal failure: ${error.message}")
+                    }
+            }
+        } catch (e: Throwable) {
+            Log.w(tag, "Firebase Auth attempt non-fatal: ${e.message}")
         }
     }
 

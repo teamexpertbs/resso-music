@@ -7,4 +7,12 @@
     <color name="teal_700">#FF018786</color>
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+    <color name="spotify_black">#121212</color>
+    <color name="spotify_dark">#181818</color>
+    <color name="spotify_card">#242424</color>
+    <color name="spotify_card_selected">#333333</color>
+    <color name="spotify_green">#1DB954</color>
+    <color name="spotify_gray">#B3B3B3</color>
+    <color name="spotify_light_gray">#535353</color>
+    <color name="spotify_search_bg">#282828</color>
 </resources>

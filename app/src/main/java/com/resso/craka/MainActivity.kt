@@ -4,10 +4,11 @@ import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
+import android.view.View
 import android.view.ViewGroup
+import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,399 +17,391 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.Explore
-import androidx.compose.material.icons.filled.LibraryMusic
-import androidx.compose.material.icons.filled.MusicVideo
-import androidx.compose.material.icons.filled.Pause
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.DrawerValue
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.ModalDrawerSheet
-import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
-import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.resso.craka.ui.comments.CommentsBottomSheet
-import com.resso.craka.ui.components.AlbumArtwork
+import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.LibraryMusic
+import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Whatshot
+import androidx.compose.material3.DrawerValue
+import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalDrawerSheet
+import androidx.compose.material3.ModalNavigationDrawer
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
+import androidx.compose.material3.Text
+import androidx.compose.material3.rememberDrawerState
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import com.resso.craka.ui.explore.ExploreScreen
 import com.resso.craka.ui.library.LibraryScreen
-import com.resso.craka.ui.lyrics.LyricPosterDialog
-import com.resso.craka.ui.player.VibePlayerScreen
 import com.resso.craka.ui.sidebar.SidebarDrawerContent
-import com.resso.craka.ui.theme.MyApplicationTheme
-import com.resso.craka.ui.theme.RessoBackground
-import com.resso.craka.ui.theme.RessoCardBg
-import com.resso.craka.ui.theme.RessoPrimary
-import com.resso.craka.ui.theme.RessoSecondary
-import com.resso.craka.ui.theme.RessoSurface
-import com.resso.craka.ui.theme.RessoTextSecondary
-import com.resso.craka.ui.viewmodel.MusicViewModel
 import kotlinx.coroutines.launch
+import com.resso.craka.data.model.Song
+import com.resso.craka.data.model.toSong
+import com.resso.craka.player.YouTubeMusicPlayerManager
+import com.resso.craka.ui.compose.BottomMiniPlayer
+import com.resso.craka.ui.compose.HomeScreen
+import com.resso.craka.ui.player.VibePlayerScreen
+import com.resso.craka.ui.theme.MyApplicationTheme
+import com.resso.craka.ui.viewmodel.MusicViewModel
 
 class MainActivity : ComponentActivity() {
-    private val musicViewModel: MusicViewModel by viewModels()
 
-    override fun onPause() {
-        super.onPause()
-        musicViewModel.streamPlayerManager.stayAwake()
-    }
+    private val viewModel: MusicViewModel by viewModels()
 
-    override fun onStop() {
-        super.onStop()
-        musicViewModel.streamPlayerManager.stayAwake()
-    }
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { _ -> }
 
-    @OptIn(ExperimentalMaterial3Api::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        requestNotificationPermission()
+
+        // Load trending songs for Home view; NO auto-search, NO keyboard
+        viewModel.restoreHomeFeed()
 
         setContent {
             MyApplicationTheme {
-                val context = LocalContext.current
-
-                // Notification permission for background playback controls
-                val notificationPermissionLauncher = rememberLauncherForActivityResult(
-                    contract = ActivityResultContracts.RequestPermission()
-                ) { /* Notification permission result handled */ }
-
-                LaunchedEffect(Unit) {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    }
-                }
-
-                var currentTab by remember { mutableStateOf("foryou") } // "foryou", "explore", "library"
-                val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
-                val coroutineScope = rememberCoroutineScope()
-
-                val isCommentsOpen by musicViewModel.isCommentsSheetOpen.collectAsState()
-                val isPosterOpen by musicViewModel.isPosterDialogOpen.collectAsState()
-                val currentSong by musicViewModel.currentSong.collectAsState()
-                val isPlaying by musicViewModel.isPlaying.collectAsState()
-
-                // Universal BackHandler for all device types and navigation modes
-                BackHandler(enabled = drawerState.isOpen || isCommentsOpen || isPosterOpen || currentTab != "foryou") {
-                    if (drawerState.isOpen) {
-                        coroutineScope.launch { drawerState.close() }
-                    } else if (isCommentsOpen) {
-                        musicViewModel.setCommentsSheetOpen(false)
-                    } else if (isPosterOpen) {
-                        musicViewModel.closeLyricPosterDialog()
-                    } else if (currentTab != "foryou") {
-                        currentTab = "foryou"
-                    }
-                }
-
-                ModalNavigationDrawer(
-                    drawerState = drawerState,
-                    gesturesEnabled = true,
-                    drawerContent = {
-                        ModalDrawerSheet(
-                            drawerContainerColor = RessoBackground,
-                            drawerContentColor = Color.White,
-                             modifier = Modifier
-                                 .fillMaxWidth(0.88f)
-                                 .widthIn(max = 320.dp)
-                        ) {
-                            SidebarDrawerContent(
-                                viewModel = musicViewModel,
-                                currentTab = currentTab,
-                                onNavigateToTab = { tab ->
-                                    currentTab = tab
-                                    coroutineScope.launch { drawerState.close() }
-                                },
-                                onCloseDrawer = {
-                                    coroutineScope.launch { drawerState.close() }
-                                }
-                            )
-                        }
-                    }
-                ) {
-                    Scaffold(
-                        bottomBar = {
-                            Column {
-                                    // Mini player bar when navigating outside the main For You player
-                                    if (currentTab != "foryou" && currentSong != null) {
-                                        MiniPlayerBar(
-                                            songId = currentSong?.id,
-                                            songTitle = currentSong?.title ?: "",
-                                            artist = currentSong?.artist ?: "",
-                                            albumArtUrl = currentSong?.albumArtUrl ?: "",
-                                            isPlaying = isPlaying,
-                                            onTogglePlay = { musicViewModel.togglePlayPause() },
-                                            onOpenPlayer = { currentTab = "foryou" }
-                                        )
-                                    }
-
-                                    NavigationBar(
-                                        containerColor = RessoBackground.copy(alpha = 0.95f),
-                                        contentColor = Color.White,
-                                        modifier = Modifier.testTag("main_bottom_nav_bar")
-                                    ) {
-                                        NavigationBarItem(
-                                            selected = currentTab == "foryou",
-                                            onClick = { currentTab = "foryou" },
-                                            icon = {
-                                                Icon(
-                                                    imageVector = Icons.Default.MusicVideo,
-                                                    contentDescription = "For You",
-                                                    tint = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary
-                                                )
-                                            },
-                                            label = {
-                                                Text(
-                                                    "For You",
-                                                    color = if (currentTab == "foryou") RessoPrimary else RessoTextSecondary,
-                                                    fontWeight = if (currentTab == "foryou") FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                indicatorColor = Color.Transparent
-                                            ),
-                                            modifier = Modifier.testTag("nav_item_for_you")
-                                        )
-
-                                        NavigationBarItem(
-                                            selected = currentTab == "explore",
-                                            onClick = { currentTab = "explore" },
-                                            icon = {
-                                                Icon(
-                                                    imageVector = Icons.Default.Search,
-                                                    contentDescription = "Search",
-                                                    tint = if (currentTab == "explore") RessoPrimary else RessoTextSecondary
-                                                )
-                                            },
-                                            label = {
-                                                Text(
-                                                    "Search",
-                                                    color = if (currentTab == "explore") RessoPrimary else RessoTextSecondary,
-                                                    fontWeight = if (currentTab == "explore") FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                indicatorColor = Color.Transparent
-                                            ),
-                                            modifier = Modifier.testTag("nav_item_search")
-                                        )
-
-                                        NavigationBarItem(
-                                            selected = currentTab == "library",
-                                            onClick = { currentTab = "library" },
-                                            icon = {
-                                                Icon(
-                                                    imageVector = Icons.Default.LibraryMusic,
-                                                    contentDescription = "Library",
-                                                    tint = if (currentTab == "library") RessoPrimary else RessoTextSecondary
-                                                )
-                                            },
-                                            label = {
-                                                Text(
-                                                    "Library",
-                                                    color = if (currentTab == "library") RessoPrimary else RessoTextSecondary,
-                                                    fontWeight = if (currentTab == "library") FontWeight.Bold else FontWeight.Normal
-                                                )
-                                            },
-                                            colors = NavigationBarItemDefaults.colors(
-                                                indicatorColor = Color.Transparent
-                                            ),
-                                            modifier = Modifier.testTag("nav_item_library")
-                                        )
-                                    }
-                                }
-                        },
-                        containerColor = RessoBackground,
-                        modifier = Modifier.fillMaxSize()
-                    ) { innerPadding ->
-                        Box(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(bottom = innerPadding.calculateBottomPadding())
-                        ) {
-                            val streamVisible by musicViewModel.streamVisible.collectAsState()
-                            if (streamVisible) {
-                                AndroidView(
-                                    factory = { _ ->
-                                        val wv = musicViewModel.streamPlayerManager.getWebView()
-                                        (wv.parent as? ViewGroup)?.removeView(wv)
-                                        wv
-                                    },
-                                    modifier = Modifier.fillMaxSize()
-                                )
-                            }
-
-                            when (currentTab) {
-                                "foryou" -> {
-                                    VibePlayerScreen(
-                                        viewModel = musicViewModel,
-                                        onNavigateToSearch = { currentTab = "explore" },
-                                        onOpenArtist = { artist ->
-                                            currentTab = "explore"
-                                            musicViewModel.openSearch(artist)
-                                        },
-                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
-                                    )
-                                }
-                                "explore" -> {
-                                    ExploreScreen(
-                                        viewModel = musicViewModel,
-                                        onSongSelected = { currentTab = "foryou" },
-                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
-                                    )
-                                }
-                                "library" -> {
-                                    LibraryScreen(
-                                        viewModel = musicViewModel,
-                                        onSongSelected = { currentTab = "foryou" },
-                                        onOpenSidebar = { coroutineScope.launch { drawerState.open() } }
-                                    )
-                                }
-                            }
-
-                            // Comments Bottom Sheet
-                            if (isCommentsOpen) {
-                                CommentsBottomSheet(
-                                    viewModel = musicViewModel,
-                                    onDismiss = { musicViewModel.setCommentsSheetOpen(false) }
-                                )
-                            }
-
-                            // Lyric Poster Dialog
-                            if (isPosterOpen) {
-                                LyricPosterDialog(
-                                    viewModel = musicViewModel,
-                                    onDismiss = { musicViewModel.closeLyricPosterDialog() }
-                                )
-                            }
-                        }
-                    }
-                }
+                MainMusicApp(viewModel = viewModel)
             }
         }
+    }
+
+    private fun requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        YouTubeMusicPlayerManager.release()
     }
 }
 
 @Composable
-fun MiniPlayerBar(
-    songId: String?,
-    songTitle: String,
-    artist: String,
-    albumArtUrl: String,
-    isPlaying: Boolean,
-    onTogglePlay: () -> Unit,
-    onOpenPlayer: () -> Unit
-) {
-    Card(
-        shape = RoundedCornerShape(topStart = 16.dp, topEnd = 16.dp),
-        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = RessoCardBg),
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onOpenPlayer)
-            .testTag("mini_player_bar")
+fun MainMusicApp(viewModel: MusicViewModel) {
+    var isPlayerExpanded by remember { mutableStateOf(false) }
+
+    // StateFlow observations
+    val songsListFromApi by viewModel.songsListFlow.collectAsState()
+    val allSongsFromDb by viewModel.allSongs.collectAsState()
+    val likedSongsFromFirestore by viewModel.firestoreLikedSongs.collectAsState()
+    val historySongsFromFirestore by viewModel.firestoreHistorySongs.collectAsState()
+
+    val searchResultsEntities by viewModel.searchResults.collectAsState()
+    val searchResults = remember(searchResultsEntities) {
+        searchResultsEntities.map { it.toSong() }
+    }
+
+    val isSearching by viewModel.isSearching.collectAsState()
+    val currentSong by viewModel.currentPlayingSongModel.collectAsState()
+    val isPlaying by viewModel.isPlaying.collectAsState()
+
+    val currentPositionMs by viewModel.currentPositionMs.collectAsState()
+    val durationMs by viewModel.durationMs.collectAsState()
+    val isShuffle by viewModel.isShuffle.collectAsState()
+    val repeatMode by viewModel.repeatMode.collectAsState()
+    val queue by viewModel.currentQueueSongModels.collectAsState()
+
+    // Determine trending songs: prefer Vercel API results or fallback to DB/repo
+    val trendingSongs = remember(songsListFromApi, allSongsFromDb) {
+        if (songsListFromApi.isNotEmpty()) {
+            songsListFromApi
+        } else if (allSongsFromDb.isNotEmpty()) {
+            allSongsFromDb.map { it.toSong() }
+        } else {
+            emptyList()
+        }
+    }
+
+    val currentIndex = remember(currentSong, queue) {
+        val currId = currentSong?.id
+        if (currId != null) queue.indexOfFirst { it.id == currId }.coerceAtLeast(0) else 0
+    }
+
+    val isCurrentSongLiked = remember(currentSong, likedSongsFromFirestore) {
+        val currId = currentSong?.id
+        currId != null && likedSongsFromFirestore.any { it.id == currId }
+    }
+
+    val progressFraction = remember(currentPositionMs, durationMs) {
+        if (durationMs > 0) (currentPositionMs.toFloat() / durationMs.toFloat()).coerceIn(0f, 1f) else 0f
+    }
+
+    var currentBottomTab by remember { mutableStateOf("home") } // "home", "explore", "library"
+    val drawerState = rememberDrawerState(initialValue = DrawerValue.Closed)
+    val coroutineScope = rememberCoroutineScope()
+
+    BackHandler(enabled = drawerState.isOpen || (!isPlayerExpanded && currentBottomTab != "home")) {
+        if (drawerState.isOpen) {
+            coroutineScope.launch { drawerState.close() }
+        } else if (!isPlayerExpanded && currentBottomTab != "home") {
+            currentBottomTab = "home"
+        }
+    }
+
+    ModalNavigationDrawer(
+        drawerState = drawerState,
+        drawerContent = {
+            ModalDrawerSheet(
+                drawerContainerColor = Color(0xFF141414),
+                modifier = Modifier.width(320.dp)
+            ) {
+                SidebarDrawerContent(
+                    viewModel = viewModel,
+                    currentTab = currentBottomTab,
+                    onNavigateToTab = { tab ->
+                        currentBottomTab = tab
+                        coroutineScope.launch { drawerState.close() }
+                    },
+                    onCloseDrawer = {
+                        coroutineScope.launch { drawerState.close() }
+                    }
+                )
+            }
+        }
     ) {
-        Row(
+        Scaffold(
+            containerColor = Color(0xFF000000),
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+        ) { innerPadding ->
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(RessoSurface)
+                    .fillMaxSize()
+                    .padding(innerPadding)
             ) {
-                AlbumArtwork(
-                    songId = songId,
-                    albumArtUrl = albumArtUrl,
-                    contentDescription = songTitle,
-                    modifier = Modifier.fillMaxSize()
+                // 1. Background YouTube Player View (Rendered with alpha 1.0 behind HomeScreen for active media playback)
+                AndroidView(
+                    factory = { context ->
+                        val frameLayout = FrameLayout(context).apply {
+                            layoutParams = ViewGroup.LayoutParams(240, 160)
+                        }
+                        val ytView = YouTubePlayerView(context).apply {
+                            layoutParams = FrameLayout.LayoutParams(
+                                FrameLayout.LayoutParams.MATCH_PARENT,
+                                FrameLayout.LayoutParams.MATCH_PARENT
+                            )
+                        }
+                        frameLayout.addView(ytView)
+                        YouTubeMusicPlayerManager.attachPlayerView(ytView)
+                        frameLayout
+                    },
+                    modifier = Modifier
+                        .size(240.dp, 160.dp)
+                        .align(Alignment.BottomEnd)
                 )
-            }
 
-            Spacer(modifier = Modifier.width(10.dp))
+                // 2. Active Screen based on currentBottomTab
+                when (currentBottomTab) {
+                    "home" -> HomeScreen(
+                        trendingSongs = trendingSongs,
+                        likedSongs = likedSongsFromFirestore,
+                        historySongs = historySongsFromFirestore,
+                        searchResults = searchResults,
+                        isSearching = isSearching,
+                        currentPlayingSongId = currentSong?.id,
+                        isPlaying = isPlaying,
+                        onSongSelected = { song, songList ->
+                            viewModel.playSongFromCompose(song, songList)
+                            isPlayerExpanded = true
+                        },
+                        onSearchQuerySubmit = { query ->
+                            viewModel.searchSongs(query)
+                        },
+                        onToggleLike = { song ->
+                            viewModel.toggleLikeSong(song)
+                        },
+                        onOpenSidebar = {
+                            coroutineScope.launch { drawerState.open() }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    "explore" -> ExploreScreen(
+                        viewModel = viewModel,
+                        onSongSelected = { isPlayerExpanded = true },
+                        onOpenSidebar = {
+                            coroutineScope.launch { drawerState.open() }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                    "library" -> LibraryScreen(
+                        viewModel = viewModel,
+                        onSongSelected = { isPlayerExpanded = true },
+                        onOpenSidebar = {
+                            coroutineScope.launch { drawerState.open() }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
 
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = songTitle,
-                    color = Color.White,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-                Text(
-                    text = artist,
-                    color = RessoTextSecondary,
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
+                // 3. Persistent Bottom Mini-Player & Resso Bottom Navigation Bar (Shown when full player is collapsed)
+                if (!isPlayerExpanded) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.BottomCenter)
+                            .fillMaxWidth()
+                    ) {
+                        if (currentSong != null) {
+                            BottomMiniPlayer(
+                                song = currentSong,
+                                isPlaying = isPlaying,
+                                progressFraction = progressFraction,
+                                onPlayPauseClick = { viewModel.togglePlayPause() },
+                                onNextClick = { viewModel.playNextSong() },
+                                onPreviousClick = { viewModel.playPreviousSong() },
+                                onExpandClick = { isPlayerExpanded = true },
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
 
-            IconButton(
-                onClick = onTogglePlay,
-                modifier = Modifier
-                    .size(36.dp)
-                    .background(RessoPrimary, CircleShape)
-                    .testTag("mini_player_play_pause_button")
-            ) {
-                Icon(
-                    imageVector = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    contentDescription = if (isPlaying) "Pause" else "Play",
-                    tint = Color.White,
-                    modifier = Modifier.size(20.dp)
-                )
+                        NavigationBar(
+                            containerColor = Color(0xFF0C0C0C),
+                            contentColor = Color.White,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(64.dp)
+                        ) {
+                            NavigationBarItem(
+                                selected = currentBottomTab == "home",
+                                onClick = { currentBottomTab = "home" },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Whatshot,
+                                        contentDescription = "For You",
+                                        tint = if (currentBottomTab == "home") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = "For You",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (currentBottomTab == "home") FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentBottomTab == "home") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFFFF2D3A),
+                                    selectedTextColor = Color(0xFFFF2D3A),
+                                    unselectedIconColor = Color(0xFF888888),
+                                    unselectedTextColor = Color(0xFF888888),
+                                    indicatorColor = Color.Transparent
+                                )
+                            )
+
+                            NavigationBarItem(
+                                selected = currentBottomTab == "explore",
+                                onClick = { currentBottomTab = "explore" },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.Search,
+                                        contentDescription = "Explore",
+                                        tint = if (currentBottomTab == "explore") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = "Explore",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (currentBottomTab == "explore") FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentBottomTab == "explore") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFFFF2D3A),
+                                    selectedTextColor = Color(0xFFFF2D3A),
+                                    unselectedIconColor = Color(0xFF888888),
+                                    unselectedTextColor = Color(0xFF888888),
+                                    indicatorColor = Color.Transparent
+                                )
+                            )
+
+                            NavigationBarItem(
+                                selected = currentBottomTab == "library",
+                                onClick = { currentBottomTab = "library" },
+                                icon = {
+                                    Icon(
+                                        imageVector = Icons.Filled.LibraryMusic,
+                                        contentDescription = "Me",
+                                        tint = if (currentBottomTab == "library") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                label = {
+                                    Text(
+                                        text = "Me",
+                                        fontSize = 11.sp,
+                                        fontWeight = if (currentBottomTab == "library") FontWeight.Bold else FontWeight.Normal,
+                                        color = if (currentBottomTab == "library") Color(0xFFFF2D3A) else Color(0xFF888888)
+                                    )
+                                },
+                                colors = NavigationBarItemDefaults.colors(
+                                    selectedIconColor = Color(0xFFFF2D3A),
+                                    selectedTextColor = Color(0xFFFF2D3A),
+                                    unselectedIconColor = Color(0xFF888888),
+                                    unselectedTextColor = Color(0xFF888888),
+                                    indicatorColor = Color.Transparent
+                                )
+                            )
+                        }
+                    }
+                }
+
+                // 4. Full Screen Resso Vibe Player (Expands with vertical swipe, lyrics, vinyl, and controls)
+                AnimatedVisibility(
+                    visible = isPlayerExpanded,
+                    enter = slideInVertically(initialOffsetY = { it }),
+                    exit = slideOutVertically(targetOffsetY = { it })
+                ) {
+                    VibePlayerScreen(
+                        viewModel = viewModel,
+                        onCollapse = { isPlayerExpanded = false },
+                        onNavigateToSearch = {
+                            isPlayerExpanded = false
+                            currentBottomTab = "explore"
+                        },
+                        onOpenSidebar = {
+                            isPlayerExpanded = false
+                            coroutineScope.launch { drawerState.open() }
+                        },
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
             }
         }
     }

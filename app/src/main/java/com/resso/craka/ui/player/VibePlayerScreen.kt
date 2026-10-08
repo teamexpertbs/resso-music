@@ -7,6 +7,9 @@ import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import com.resso.craka.ui.storyboard.RessoLogoIcon
+import com.resso.craka.ui.comments.CommentsBottomSheet
+import com.resso.craka.ui.lyrics.LyricPosterDialog
 import androidx.core.content.ContextCompat
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -53,6 +56,7 @@ import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.FlashOn
 import androidx.compose.material.icons.filled.FormatQuote
+import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MusicVideo
 import androidx.compose.material.icons.filled.Pause
@@ -121,6 +125,7 @@ import kotlinx.coroutines.launch
 fun VibePlayerScreen(
     viewModel: MusicViewModel,
     onNavigateToSearch: () -> Unit = {},
+    onCollapse: () -> Unit = {},
     onOpenArtist: (String) -> Unit = {},
     onOpenSidebar: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -157,9 +162,16 @@ fun VibePlayerScreen(
     val heartScale = remember { Animatable(0f) }
     val isVideoMode by viewModel.isVideoMode.collectAsState()
     val isLyricsVisible by viewModel.isLyricsVisible.collectAsState()
+    val isPosterDialogOpen by viewModel.isPosterDialogOpen.collectAsState()
+    var showCommentsSheet by remember { mutableStateOf(false) }
+    var activeDialogSheet by remember { mutableStateOf<String?>(null) }
 
-    BackHandler(enabled = isLyricsVisible) {
-        viewModel.setLyricsVisible(false)
+    BackHandler(enabled = true) {
+        if (isLyricsVisible) {
+            viewModel.setLyricsVisible(false)
+        } else {
+            onCollapse()
+        }
     }
 
     // Auto-scroll lyrics smoothly to active index when lyrics are open
@@ -249,14 +261,14 @@ fun VibePlayerScreen(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(
-                    onClick = onOpenSidebar,
+                    onClick = onCollapse,
                     modifier = Modifier
                         .size(36.dp)
-                        .testTag("open_sidebar_button")
+                        .testTag("collapse_vibe_player")
                 ) {
                     Icon(
-                        imageVector = Icons.Default.Menu,
-                        contentDescription = "Open menu",
+                        imageVector = Icons.Default.KeyboardArrowDown,
+                        contentDescription = "Collapse",
                         tint = Color.White
                     )
                 }
@@ -267,24 +279,30 @@ fun VibePlayerScreen(
                     horizontalArrangement = Arrangement.Center,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "resso",
-                        fontSize = if (!isLyricsVisible) 22.sp else 18.sp,
-                        fontWeight = if (!isLyricsVisible) FontWeight.ExtraBold else FontWeight.Medium,
-                        color = if (!isLyricsVisible) Color.White else Color.White.copy(alpha = 0.45f),
-                        letterSpacing = (-0.5).sp,
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .clip(RoundedCornerShape(8.dp))
                             .clickable { viewModel.setLyricsVisible(false) }
                             .padding(horizontal = 6.dp, vertical = 4.dp)
                             .testTag("header_tab_resso")
-                    )
+                    ) {
+                        RessoLogoIcon(size = if (!isLyricsVisible) 20.dp else 16.dp)
+                        Spacer(modifier = Modifier.width(6.dp))
+                        Text(
+                            text = "resso",
+                            fontSize = if (!isLyricsVisible) 22.sp else 18.sp,
+                            fontWeight = if (!isLyricsVisible) FontWeight.ExtraBold else FontWeight.Medium,
+                            color = if (!isLyricsVisible) Color.White else Color.White.copy(alpha = 0.45f),
+                            letterSpacing = (-0.5).sp
+                        )
+                    }
                     Text(
                         text = "/",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Light,
                         color = Color.White.copy(alpha = 0.35f),
-                        modifier = Modifier.padding(horizontal = 2.dp)
+                        modifier = Modifier.padding(horizontal = 4.dp)
                     )
                     Text(
                         text = "lyrics",
@@ -319,23 +337,87 @@ fun VibePlayerScreen(
             }
 
             if (!showMusicVideo && !isLyricsVisible) {
-                BoxWithConstraints(
+                Box(
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxWidth()
-                        .padding(horizontal = 24.dp, vertical = 8.dp),
-                    contentAlignment = Alignment.Center
+                        .padding(vertical = 4.dp)
                 ) {
-                    val artSize = minOf(maxWidth, maxHeight)
-                    AlbumArtwork(
-                        songId = currentSong?.id,
-                        albumArtUrl = currentSong?.albumArtUrl,
-                        contentDescription = currentSong?.title ?: "Song cover",
+                    BoxWithConstraints(
                         modifier = Modifier
-                            .size(artSize)
-                            .clip(RoundedCornerShape(14.dp))
-                            .testTag("player_album_art")
-                    )
+                            .fillMaxSize()
+                            .padding(start = 20.dp, end = 58.dp, top = 4.dp, bottom = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val artSize = minOf(maxWidth, maxHeight)
+                        AlbumArtwork(
+                            songId = currentSong?.id,
+                            albumArtUrl = currentSong?.albumArtUrl,
+                            contentDescription = currentSong?.title ?: "Song cover",
+                            modifier = Modifier
+                                .size(artSize)
+                                .clip(RoundedCornerShape(20.dp))
+                                .testTag("player_album_art")
+                        )
+                    }
+
+                    // Floating Right-Side Action Bar (Iconic Resso UI)
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val isLiked = currentSong?.isLiked == true
+                        PlayerActionButton(
+                            icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            label = if (isLiked) "Liked" else "Like",
+                            tint = if (isLiked) RessoPrimary else Color.White,
+                            tag = "side_like_button",
+                            onClick = { viewModel.toggleLikeCurrentSong() }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.ChatBubble,
+                            label = if (comments.isNotEmpty()) "${comments.size}" else "Vibe",
+                            tint = Color.White,
+                            tag = "side_comments_button",
+                            onClick = { showCommentsSheet = true }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.FormatQuote,
+                            label = "Quote",
+                            tint = Color.White,
+                            tag = "side_quote_button",
+                            onClick = { viewModel.openLyricPosterDialog(null) }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.Share,
+                            label = "Share",
+                            tint = Color.White,
+                            tag = "side_share_button",
+                            onClick = {
+                                val s = currentSong
+                                val shareText = "Listening to \"${s?.title ?: "Music"}\" by ${s?.artist ?: ""} on Resso 🎵\n${s?.audioUrl.orEmpty()}"
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share song"))
+                            }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.AutoAwesome,
+                            label = "Vibe",
+                            tint = if (!currentVibeUri.isNullOrBlank()) RessoPrimary else Color.White,
+                            tag = "side_vibe_button",
+                            onClick = { activeDialogSheet = "vibe" }
+                        )
+                    }
                 }
                 Text(
                     text = currentSong?.title ?: "Pick a song",
@@ -389,6 +471,19 @@ fun VibePlayerScreen(
                         )
                     }
                     IconButton(
+                        onClick = { viewModel.openLyricPosterDialog(null) },
+                        modifier = Modifier
+                            .size(32.dp)
+                            .testTag("quote_lyrics_poster_button")
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.FormatQuote,
+                            contentDescription = "Create Lyric Poster",
+                            tint = RessoPrimary
+                        )
+                    }
+                    Spacer(modifier = Modifier.width(6.dp))
+                    IconButton(
                         onClick = { viewModel.setLyricsVisible(false) },
                         modifier = Modifier
                             .size(32.dp)
@@ -437,23 +532,87 @@ fun VibePlayerScreen(
                     } else {
                         itemsIndexed(lyrics) { index, lyric ->
                             val isActive = index == activeLyricIndex
-                            Text(
-                                text = lyric.text,
-                                fontSize = if (isActive) 23.sp else 16.sp,
-                                fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
-                                color = if (isActive) Color.White else Color.White.copy(alpha = 0.38f),
-                                lineHeight = if (isActive) 32.sp else 24.sp,
+                            Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .padding(vertical = 10.dp, horizontal = 4.dp)
+                                    .clip(RoundedCornerShape(8.dp))
                                     .clickable { viewModel.seekToLyric(lyric.timeMs) }
-                                    .testTag("lyric_line_$index")
-                            )
+                                    .padding(vertical = 4.dp, horizontal = 4.dp)
+                                    .testTag("lyric_line_$index"),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = lyric.text,
+                                    fontSize = if (isActive) 23.sp else 16.sp,
+                                    fontWeight = if (isActive) FontWeight.ExtraBold else FontWeight.Medium,
+                                    color = if (isActive) Color.White else Color.White.copy(alpha = 0.38f),
+                                    lineHeight = if (isActive) 32.sp else 24.sp,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                if (isActive) {
+                                    IconButton(
+                                        onClick = { viewModel.openLyricPosterDialog(lyric) },
+                                        modifier = Modifier.size(28.dp)
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.FormatQuote,
+                                            contentDescription = "Quote lyric",
+                                            tint = RessoPrimary,
+                                            modifier = Modifier.size(18.dp)
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
                 }
             } else {
-                Spacer(modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .padding(end = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        val isLiked = currentSong?.isLiked == true
+                        PlayerActionButton(
+                            icon = if (isLiked) Icons.Default.Favorite else Icons.Default.FavoriteBorder,
+                            label = if (isLiked) "Liked" else "Like",
+                            tint = if (isLiked) RessoPrimary else Color.White,
+                            tag = "side_like_button",
+                            onClick = { viewModel.toggleLikeCurrentSong() }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.ChatBubble,
+                            label = if (comments.isNotEmpty()) "${comments.size}" else "Vibe",
+                            tint = Color.White,
+                            tag = "side_comments_button",
+                            onClick = { showCommentsSheet = true }
+                        )
+
+                        PlayerActionButton(
+                            icon = Icons.Default.Share,
+                            label = "Share",
+                            tint = Color.White,
+                            tag = "side_share_button",
+                            onClick = {
+                                val s = currentSong
+                                val shareText = "Listening to \"${s?.title ?: "Music"}\" by ${s?.artist ?: ""} on Resso 🎵\n${s?.audioUrl.orEmpty()}"
+                                val intent = Intent(Intent.ACTION_SEND).apply {
+                                    type = "text/plain"
+                                    putExtra(Intent.EXTRA_TEXT, shareText)
+                                }
+                                context.startActivity(Intent.createChooser(intent, "Share song"))
+                            }
+                        )
+                    }
+                }
                 if (showMusicVideo) {
                     Text(
                         text = currentSong?.title ?: "",
@@ -532,7 +691,11 @@ fun VibePlayerScreen(
             }
 
             // Secondary tools row (Sleep, 8D Audio, Vibe, EQ, Save, Sync)
-            PlayerToolRow(viewModel)
+            PlayerToolRow(
+                viewModel = viewModel,
+                sheet = activeDialogSheet,
+                onSetSheet = { activeDialogSheet = it }
+            )
         }
 
         // 5. Double Tap Animated Heart Overlay
@@ -545,6 +708,21 @@ fun VibePlayerScreen(
                     .align(Alignment.Center)
                     .size(110.dp)
                     .scale(heartScale.value)
+            )
+        }
+
+        // 6. Resso Overlays: Comments Bottom Sheet & Lyric Poster Dialog
+        if (showCommentsSheet) {
+            CommentsBottomSheet(
+                viewModel = viewModel,
+                onDismiss = { showCommentsSheet = false }
+            )
+        }
+
+        if (isPosterDialogOpen) {
+            LyricPosterDialog(
+                viewModel = viewModel,
+                onDismiss = { viewModel.closeLyricPosterDialog() }
             )
         }
 
@@ -616,14 +794,17 @@ private fun PlayerTopActionButton(
 }
 
 @Composable
-private fun PlayerToolRow(viewModel: MusicViewModel) {
+private fun PlayerToolRow(
+    viewModel: MusicViewModel,
+    sheet: String?,
+    onSetSheet: (String?) -> Unit
+) {
     val context = LocalContext.current
     val currentSong by viewModel.currentSong.collectAsState()
     val currentVibeUri by viewModel.currentVibeUri.collectAsState()
     val sleep by viewModel.sleepMinutesLeft.collectAsState()
     val offset by viewModel.lyricOffsetMs.collectAsState()
     val is8D by viewModel.is8DAudioEnabled.collectAsState()
-    var sheet by remember { mutableStateOf<String?>(null) }
 
     Row(
         modifier = Modifier
@@ -632,16 +813,16 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
             .padding(top = 12.dp),
         horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally)
     ) {
-        ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { sheet = "sleep" }
+        ToolChip(if (sleep > 0) "🌙 ${sleep}m" else "🌙 Sleep") { onSetSheet("sleep") }
         ToolChip(if (is8D) "🎧 8D ON" else "🎧 8D", selected = is8D) { viewModel.toggle8DAudio() }
-        ToolChip(if (!currentVibeUri.isNullOrBlank()) "✨ Vibe ON" else "✨ Vibe", selected = !currentVibeUri.isNullOrBlank()) { sheet = "vibe" }
-        ToolChip("EQ") { sheet = "eq" }
+        ToolChip(if (!currentVibeUri.isNullOrBlank()) "✨ Vibe ON" else "✨ Vibe", selected = !currentVibeUri.isNullOrBlank()) { onSetSheet("vibe") }
+        ToolChip("EQ") { onSetSheet("eq") }
         ToolChip("Save") { viewModel.saveCurrentOffline() }
-        ToolChip("Sync") { sheet = "offset" }
+        ToolChip("Sync") { onSetSheet("offset") }
     }
     when (sheet) {
         "sleep" -> AlertDialog(
-            onDismissRequest = { sheet = null },
+            onDismissRequest = { onSetSheet(null) },
             containerColor = Color(0xFF161616),
             title = { Text("Sleep timer", color = Color.White) },
             text = {
@@ -649,7 +830,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                     listOf(15, 30, 60).forEach { minutes ->
                         TextButton(onClick = {
                             viewModel.startSleepTimer(minutes)
-                            sheet = null
+                            onSetSheet(null)
                         }) { Text("${minutes}m") }
                     }
                 }
@@ -657,12 +838,12 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
             confirmButton = {
                 TextButton(onClick = {
                     viewModel.cancelSleepTimer()
-                    sheet = null
+                    onSetSheet(null)
                 }) { Text("Cancel timer") }
             }
         )
         "eq" -> AlertDialog(
-            onDismissRequest = { sheet = null },
+            onDismissRequest = { onSetSheet(null) },
             containerColor = Color(0xFF161616),
             title = { Text("Equalizer", color = Color.White) },
             text = {
@@ -675,17 +856,17 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                                 .fillMaxWidth()
                                 .clickable {
                                     viewModel.setEqualizerPreset(preset)
-                                    sheet = null
+                                    onSetSheet(null)
                                 }
                                 .padding(vertical = 8.dp)
                         )
                     }
                 }
             },
-            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
+            confirmButton = { TextButton(onClick = { onSetSheet(null) }) { Text("Close") } }
         )
         "offset" -> AlertDialog(
-            onDismissRequest = { sheet = null },
+            onDismissRequest = { onSetSheet(null) },
             containerColor = Color(0xFF161616),
             title = { Text("Lyrics sync ${offset / 1000f}s", color = Color.White) },
             text = {
@@ -694,7 +875,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                     TextButton(onClick = { viewModel.nudgeLyricOffset(500) }) { Text("+0.5s") }
                 }
             },
-            confirmButton = { TextButton(onClick = { sheet = null }) { Text("Done") } }
+            confirmButton = { TextButton(onClick = { onSetSheet(null) }) { Text("Done") } }
         )
         "vibe" -> {
             val videoPicker = rememberLauncherForActivityResult(
@@ -709,12 +890,12 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                         endTrimMs = 30000L,
                         filterType = "Normal"
                     )
-                    sheet = null
+                    onSetSheet(null)
                 }
             }
 
             AlertDialog(
-                onDismissRequest = { sheet = null },
+                onDismissRequest = { onSetSheet(null) },
                 containerColor = Color(0xFF161616),
                 title = { Text("Song Vibe & Background", color = Color.White, fontWeight = FontWeight.Bold) },
                 text = {
@@ -759,7 +940,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                                         currentSong?.let { s ->
                                             viewModel.saveCustomSongVibe(s.id, name, url, 0L, 30000L, "Normal")
                                         }
-                                        sheet = null
+                                        onSetSheet(null)
                                     }
                                     .padding(horizontal = 12.dp, vertical = 10.dp)
                             ) {
@@ -773,7 +954,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                                     currentSong?.let { s ->
                                         viewModel.saveCustomSongVibe(s.id, "", "", 0L, 0L, "")
                                     }
-                                    sheet = null
+                                    onSetSheet(null)
                                 },
                                 modifier = Modifier.fillMaxWidth()
                             ) {
@@ -782,7 +963,7 @@ private fun PlayerToolRow(viewModel: MusicViewModel) {
                         }
                     }
                 },
-                confirmButton = { TextButton(onClick = { sheet = null }) { Text("Close") } }
+                confirmButton = { TextButton(onClick = { onSetSheet(null) }) { Text("Close") } }
             )
         }
     }

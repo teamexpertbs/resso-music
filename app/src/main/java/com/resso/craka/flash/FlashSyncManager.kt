@@ -6,14 +6,14 @@ import android.hardware.camera2.CameraCharacteristics
 import android.hardware.camera2.CameraManager
 import android.os.Handler
 import android.os.HandlerThread
+import android.os.Looper
 import android.os.Process
 import android.util.Log
 
 /**
  * Ultra-Low-Latency Hardware Flash Torch Synchronization Manager.
- * Uses a dedicated real-time HandlerThread to eliminate coroutine dispatch latency,
- * thread contention, and Camera IPC queue delays.
- * Synchronizes physical LED strobe flashes (38ms pulse) with zero audio-lag.
+ * Safely manages camera flash strobe pulses without throwing security exceptions
+ * or crashing on devices without flash hardware.
  */
 class FlashSyncManager(private val context: Context) {
 
@@ -23,7 +23,11 @@ class FlashSyncManager(private val context: Context) {
         private const val MIN_STROBE_INTERVAL_MS = 140L // Guard against LED overheating / camera binder flood
     }
 
-    private val cameraManager = context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+    private val cameraManager = try {
+        context.getSystemService(Context.CAMERA_SERVICE) as? CameraManager
+    } catch (_: Throwable) {
+        null
+    }
     private var cameraId: String? = null
 
     @Volatile
@@ -34,14 +38,23 @@ class FlashSyncManager(private val context: Context) {
     var isBeatSyncRunning = false
         private set
 
-    // Zero-lag offset (hardware IPC is ~15ms, perfectly matches speaker AudioTrack output)
-    var latencyOffsetMs: Long = 0L
+    var latencyOffsetMs: Long = 180L
 
-    // Dedicated high-priority thread for instant, deterministic torch control
-    private val flashThread = HandlerThread("FlashSyncThread", Process.THREAD_PRIORITY_URGENT_AUDIO).apply {
-        start()
+    // Dedicated background thread with safe priority to avoid SecurityException on OEM ROMs
+    private val flashThread: HandlerThread? = try {
+        HandlerThread("FlashSyncThread", Process.THREAD_PRIORITY_DEFAULT).apply {
+            start()
+        }
+    } catch (t: Throwable) {
+        Log.w(TAG, "Fallback HandlerThread: ${t.message}")
+        null
     }
-    private val flashHandler = Handler(flashThread.looper)
+
+    private val flashHandler: Handler = try {
+        flashThread?.looper?.let { Handler(it) } ?: Handler(Looper.getMainLooper())
+    } catch (_: Throwable) {
+        Handler(Looper.getMainLooper())
+    }
 
     private var lastFlashTimestamp = 0L
 
@@ -54,27 +67,39 @@ class FlashSyncManager(private val context: Context) {
             if (!isBeatSyncRunning) return
             pulseInternal(0L)
             // 128 BPM energetic beat pulse (468ms interval)
-            flashHandler.postDelayed(this, 468L)
+            try {
+                flashHandler.postDelayed(this, 468L)
+            } catch (_: Throwable) {}
         }
     }
 
     init {
-        findCameraWithFlash()
+        try {
+            flashHandler.post {
+                findCameraWithFlash()
+            }
+        } catch (_: Throwable) {}
     }
 
     private fun findCameraWithFlash() {
+        if (cameraId != null) return
         try {
-            cameraManager?.cameraIdList?.forEach { id ->
-                val characteristics = cameraManager.getCameraCharacteristics(id)
-                val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
-                val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
-                if (hasFlash && (facing == CameraCharacteristics.LENS_FACING_BACK || cameraId == null)) {
-                    cameraId = id
-                    if (facing == CameraCharacteristics.LENS_FACING_BACK) return
+            val cm = cameraManager ?: return
+            val idList = cm.cameraIdList ?: return
+            for (id in idList) {
+                try {
+                    val characteristics = cm.getCameraCharacteristics(id)
+                    val hasFlash = characteristics.get(CameraCharacteristics.FLASH_INFO_AVAILABLE) == true
+                    val facing = characteristics.get(CameraCharacteristics.LENS_FACING)
+                    if (hasFlash && (facing == CameraCharacteristics.LENS_FACING_BACK || cameraId == null)) {
+                        cameraId = id
+                        if (facing == CameraCharacteristics.LENS_FACING_BACK) return
+                    }
+                } catch (_: Throwable) {
                 }
             }
-        } catch (e: Exception) {
-            Log.w(TAG, "Error finding flash camera: ${e.message}")
+        } catch (t: Throwable) {
+            Log.w(TAG, "Safe check for flash camera: ${t.message}")
             cameraId = null
         }
     }
@@ -83,63 +108,79 @@ class FlashSyncManager(private val context: Context) {
      * Pulses the camera torch once on beat with microsecond-level accuracy.
      */
     fun pulseOnce(delayMs: Long = latencyOffsetMs) {
-        if (!isBeatSyncRunning) return
+        if (!isBeatSyncRunning || cameraId == null) return
         val effectiveDelay = delayMs.coerceAtLeast(0L)
-        if (effectiveDelay == 0L) {
-            flashHandler.post {
-                pulseInternal(0L)
+        try {
+            if (effectiveDelay == 0L) {
+                flashHandler.post {
+                    pulseInternal(0L)
+                }
+            } else {
+                flashHandler.postDelayed({
+                    pulseInternal(0L)
+                }, effectiveDelay)
             }
-        } else {
-            flashHandler.postDelayed({
-                pulseInternal(0L)
-            }, effectiveDelay)
-        }
+        } catch (_: Throwable) {}
     }
 
     private fun pulseInternal(extraOffsetMs: Long) {
-        if (!isBeatSyncRunning) return
+        if (!isBeatSyncRunning || cameraId == null) return
         val now = android.os.SystemClock.elapsedRealtime()
         if (now - lastFlashTimestamp < MIN_STROBE_INTERVAL_MS) {
             return
         }
         lastFlashTimestamp = now
 
-        // Cancel any pending turn-off to avoid race conditions
-        flashHandler.removeCallbacks(turnOffRunnable)
+        try {
+            // Cancel any pending turn-off to avoid race conditions
+            flashHandler.removeCallbacks(turnOffRunnable)
 
-        // Turn on instantly
-        applyTorch(true)
+            // Turn on instantly
+            applyTorch(true)
 
-        // Schedule turn-off precisely after 38ms
-        flashHandler.postDelayed(turnOffRunnable, FLASH_PULSE_DURATION_MS)
+            // Schedule turn-off precisely after 38ms
+            flashHandler.postDelayed(turnOffRunnable, FLASH_PULSE_DURATION_MS)
+        } catch (_: Throwable) {}
     }
 
     fun startDirectSync() {
         stopSync()
-        isBeatSyncRunning = true
+        if (cameraId == null) findCameraWithFlash()
+        if (cameraId != null) {
+            isBeatSyncRunning = true
+        }
     }
 
     fun startFallbackRhythm() {
         stopSync()
-        isBeatSyncRunning = true
-        flashHandler.post(fallbackRhythmRunnable)
+        if (cameraId == null) findCameraWithFlash()
+        if (cameraId != null) {
+            isBeatSyncRunning = true
+            try {
+                flashHandler.post(fallbackRhythmRunnable)
+            } catch (_: Throwable) {}
+        }
     }
 
     fun stopSync() {
         isBeatSyncRunning = false
-        flashHandler.removeCallbacks(fallbackRhythmRunnable)
-        flashHandler.removeCallbacks(turnOffRunnable)
-        flashHandler.post {
-            applyTorch(false)
-        }
+        try {
+            flashHandler.removeCallbacksAndMessages(null)
+            flashHandler.post {
+                applyTorch(false)
+            }
+        } catch (_: Throwable) {}
     }
 
     fun toggleSteadyTorch(): Boolean {
         stopSync()
+        if (cameraId == null) findCameraWithFlash()
         val newState = !isTorchOn
-        flashHandler.post {
-            applyTorch(newState)
-        }
+        try {
+            flashHandler.post {
+                applyTorch(newState)
+            }
+        } catch (_: Throwable) {}
         return newState
     }
 
@@ -148,10 +189,15 @@ class FlashSyncManager(private val context: Context) {
         try {
             cameraManager?.setTorchMode(cid, on)
             isTorchOn = on
-        } catch (_: CameraAccessException) {
-            isTorchOn = false
-        } catch (_: Exception) {
+        } catch (_: Throwable) {
             isTorchOn = false
         }
+    }
+
+    fun release() {
+        stopSync()
+        try {
+            flashThread?.quitSafely()
+        } catch (_: Throwable) {}
     }
 }

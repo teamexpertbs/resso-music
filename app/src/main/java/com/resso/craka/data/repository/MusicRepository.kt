@@ -1,6 +1,7 @@
 package com.resso.craka.data.repository
 
 import android.content.Context
+import android.util.Log
 import androidx.room.Room
 import com.resso.craka.data.db.AppDatabase
 import com.resso.craka.data.firebase.FirebaseMusicManager
@@ -21,7 +22,7 @@ class MusicRepository(context: Context) {
         appContext,
         AppDatabase::class.java,
         "resso_music.db"
-    ).build()
+    ).fallbackToDestructiveMigration(dropAllTables = false).build()
 
     val songDao = db.songDao()
     val vibeDao = db.vibeDao()
@@ -34,11 +35,15 @@ class MusicRepository(context: Context) {
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            songDao.purgeLocalSongs()
-            seedInitialDataIfEmpty()
-            songDao.clearPlaceholderLyrics()
-            updateDefaultStreamsIfEmpty()
-            syncFromCloud()
+            try {
+                songDao.purgeLocalSongs()
+                seedInitialDataIfEmpty()
+                songDao.clearPlaceholderLyrics()
+                updateDefaultStreamsIfEmpty()
+                syncFromCloud()
+            } catch (t: Throwable) {
+                Log.e("MusicRepository", "Background init error: ${t.message}", t)
+            }
         }
     }
 

@@ -3,6 +3,7 @@ package com.resso.craka.ui.sidebar
 import android.Manifest
 import android.content.pm.PackageManager
 import android.widget.Toast
+import com.resso.craka.ui.storyboard.RessoLogoIcon
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -133,37 +134,21 @@ fun SidebarDrawerContent(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Box(
-                    modifier = Modifier
-                        .size(40.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Brush.linearGradient(
-                                listOf(RessoPrimary, RessoSecondary)
-                            )
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.MusicNote,
-                        contentDescription = null,
-                        tint = Color.White,
-                        modifier = Modifier.size(22.dp)
-                    )
-                }
+                RessoLogoIcon(size = 38.dp)
                 Spacer(modifier = Modifier.width(12.dp))
                 Column {
                     Text(
-                        text = "Resso Music",
-                        fontSize = 19.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color.White
+                        text = "resso",
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.ExtraBold,
+                        color = Color.White,
+                        letterSpacing = (-0.8).sp
                     )
                     Text(
-                        text = "ByteDance Edition • VIP Active",
+                        text = "Music Experience",
                         fontSize = 11.sp,
                         color = RessoSecondary,
-                        fontWeight = FontWeight.SemiBold
+                        fontWeight = FontWeight.Medium
                     )
                 }
             }

@@ -431,7 +431,7 @@ fun ExploreScreen(
                                 val song = recentSongs[index]
                                 Column(
                                     modifier = Modifier
-                                        .width(112.dp)
+                                        .width(130.dp)
                                         .clickable {
                                             viewModel.playSongFromAnywhere(song, autoPlay = true, queue = recentSongs)
                                             onSongSelected()
@@ -442,8 +442,8 @@ fun ExploreScreen(
                                         albumArtUrl = song.albumArtUrl,
                                         contentDescription = song.title,
                                         modifier = Modifier
-                                            .size(112.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .size(130.dp)
+                                            .clip(RoundedCornerShape(12.dp))
                                     )
                                     Text(
                                         text = song.title,
@@ -482,7 +482,7 @@ fun ExploreScreen(
                                 val song = songs[index]
                                 Column(
                                     modifier = Modifier
-                                        .width(112.dp)
+                                        .width(130.dp)
                                         .clickable {
                                             viewModel.playSongFromAnywhere(song, autoPlay = true, queue = songs)
                                             onSongSelected()
@@ -493,8 +493,8 @@ fun ExploreScreen(
                                         albumArtUrl = song.albumArtUrl,
                                         contentDescription = song.title,
                                         modifier = Modifier
-                                            .size(112.dp)
-                                            .clip(RoundedCornerShape(10.dp))
+                                            .size(130.dp)
+                                            .clip(RoundedCornerShape(12.dp))
                                     )
                                     Text(
                                         text = song.title,
@@ -716,8 +716,8 @@ fun SongListItem(
             // Album Art with Play / Equalizer overlay
             Box(
                 modifier = Modifier
-                    .size(54.dp)
-                    .clip(RoundedCornerShape(10.dp))
+                    .size(66.dp)
+                    .clip(RoundedCornerShape(12.dp))
                     .background(RessoCardBg)
             ) {
                 AlbumArtwork(

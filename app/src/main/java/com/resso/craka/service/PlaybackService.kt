@@ -100,7 +100,19 @@ class PlaybackService : Service() {
                 }
 
                 val notification = buildNotification(title, artist, playing, artBitmap)
-                startForeground(NOTIFICATION_ID, notification)
+                try {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                        startForeground(
+                            NOTIFICATION_ID,
+                            notification,
+                            android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+                        )
+                    } else {
+                        startForeground(NOTIFICATION_ID, notification)
+                    }
+                } catch (t: Throwable) {
+                    android.util.Log.w("PlaybackService", "startForeground error: ${t.message}")
+                }
                 updateSession(title, artist, playing, artBitmap, positionMs, playbackDurationMs)
                 if (playing) holdWakeLock() else releaseWakeLock()
                 loadArtwork(title, artist, playing, songId, artUrl)
@@ -340,7 +352,11 @@ class PlaybackService : Service() {
                 putExtra(EXTRA_POSITION, positionMs)
                 putExtra(EXTRA_DURATION, durationMs)
             }
-            ContextCompat.startForegroundService(context, intent)
+            try {
+                ContextCompat.startForegroundService(context, intent)
+            } catch (t: Throwable) {
+                android.util.Log.w("PlaybackService", "Failed to start service: ${t.message}")
+            }
         }
 
         fun stop(context: Context) {

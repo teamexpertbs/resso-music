@@ -92,9 +92,13 @@ object ArtworkUrls {
 
     private fun youtubeFallbacks(songId: String?): List<String> {
         val id = songId.orEmpty()
-        if (!id.startsWith("yt_") || id.length <= 3) return emptyList()
-        val videoId = id.removePrefix("yt_")
+        val videoId = when {
+            id.startsWith("yt_") -> id.removePrefix("yt_")
+            id.length in 10..15 && !id.startsWith("saavn") -> id
+            else -> return emptyList()
+        }
         return listOf(
+            "https://i.ytimg.com/vi/$videoId/maxresdefault.jpg",
             "https://i.ytimg.com/vi/$videoId/hqdefault.jpg",
             "https://i.ytimg.com/vi/$videoId/mqdefault.jpg"
         )

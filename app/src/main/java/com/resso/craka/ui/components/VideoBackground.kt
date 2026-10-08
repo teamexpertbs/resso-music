@@ -44,7 +44,10 @@ fun VideoBackground(
     Box(modifier = modifier.fillMaxSize().background(Color.Black)) {
         if (!videoUri.isNullOrBlank()) {
             val videoPlayer = remember(videoUri) {
-                ExoPlayer.Builder(context).build().apply {
+                val renderersFactory = androidx.media3.exoplayer.DefaultRenderersFactory(context)
+                    .setEnableDecoderFallback(true)
+                    .setExtensionRendererMode(androidx.media3.exoplayer.DefaultRenderersFactory.EXTENSION_RENDERER_MODE_OFF)
+                ExoPlayer.Builder(context, renderersFactory).build().apply {
                     repeatMode = Player.REPEAT_MODE_ALL
                     volume = 0f // Muted background video for Vibe
                     try {
