@@ -52,6 +52,8 @@ import kotlinx.coroutines.launch
 
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as RessoApplication).repository
+    val firestoreRepository: com.resso.craka.data.repository.FirestoreRepository =
+        com.resso.craka.data.repository.FirestoreRepository.getInstance(application)
     val flashSyncManager = FlashSyncManager(application)
     val eightDAudioProcessor = Spatial8DAudioProcessor()
     val beatDetectionAudioProcessor = BeatDetectionAudioProcessor {
@@ -126,11 +128,27 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     val allVibes: StateFlow<List<VibeEntity>> = repository.getAllVibes()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val firestoreCachedSongs: StateFlow<List<com.resso.craka.data.model.Song>> =
+        firestoreRepository.getCachedSongsFlow(60)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val firestoreLikedSongs: StateFlow<List<com.resso.craka.data.model.Song>> =
+        firestoreRepository.getLikedSongsFlow("user_default")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val firestoreHistorySongs: StateFlow<List<com.resso.craka.data.model.Song>> =
+        firestoreRepository.getHistoryFlow("user_default")
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
     private val _currentSongIndex = MutableStateFlow(0)
     val currentSongIndexFlow: StateFlow<Int> = _currentSongIndex.asStateFlow()
 
     private val _currentSong = MutableStateFlow<SongEntity?>(null)
     val currentSong: StateFlow<SongEntity?> = _currentSong.asStateFlow()
+
+    val currentPlayingSongModel: StateFlow<com.resso.craka.data.model.Song?> =
+        _currentSong.map { entity -> entity?.toSong() }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _isPlaying = MutableStateFlow(false)
     val isPlaying: StateFlow<Boolean> = _isPlaying.asStateFlow()
@@ -354,6 +372,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private val playbackQueue = MutableStateFlow<List<SongEntity>>(emptyList())
     val queue: StateFlow<List<SongEntity>> = playbackQueue.asStateFlow()
+
+    val currentQueueSongModels: StateFlow<List<com.resso.craka.data.model.Song>> =
+        playbackQueue.map { list -> list.map { it.toSong() } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private val _recentSongs = MutableStateFlow<List<SongEntity>>(emptyList())
     val recentSongs: StateFlow<List<SongEntity>> = _recentSongs.asStateFlow()
@@ -1793,35 +1815,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun ensureAutoplayQueue(currentSong: SongEntity) = ensureAutoplayRadioBuffer(currentSong)
 
     // --- Compose UI & Telegram / Firestore Integration Helpers ---
-    val firestoreRepository: com.resso.craka.data.repository.FirestoreRepository by lazy {
-        com.resso.craka.data.repository.FirestoreRepository.getInstance(getApplication())
-    }
-
-        val firestoreCachedSongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
-        firestoreRepository.getCachedSongsFlow(60)
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    }
-
-val firestoreLikedSongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
-        firestoreRepository.getLikedSongsFlow("user_default")
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    }
-
-    val firestoreHistorySongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
-        firestoreRepository.getHistoryFlow("user_default")
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    }
-
-    val currentPlayingSongModel: StateFlow<com.resso.craka.data.model.Song?> by lazy {
-        _currentSong.map { entity -> entity?.toSong() }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
-    }
-
-    val currentQueueSongModels: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
-        playbackQueue.map { list -> list.map { it.toSong() } }
-            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
-    }
-
     fun playSongFromCompose(song: com.resso.craka.data.model.Song, queue: List<com.resso.craka.data.model.Song> = emptyList()) {
         viewModelScope.launch(Dispatchers.IO) {
             var finalSong = song

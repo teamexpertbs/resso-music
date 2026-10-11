@@ -22,7 +22,7 @@ class MusicRepository(context: Context) {
         appContext,
         AppDatabase::class.java,
         "resso_music.db"
-    ).fallbackToDestructiveMigration(dropAllTables = false).build()
+    ).fallbackToDestructiveMigration().build()
 
     val songDao = db.songDao()
     val vibeDao = db.vibeDao()
