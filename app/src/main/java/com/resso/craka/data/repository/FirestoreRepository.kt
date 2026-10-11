@@ -40,7 +40,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      * Safely retrieves FirebaseFirestore instance, ensuring FirebaseApp is initialized.
      * Never throws IllegalStateException if Firebase is initializing.
      */
-    fun getDb(): FirebaseFirestore? {
+    fun obtainDb(): FirebaseFirestore? {
         return try {
             if (FirebaseApp.getApps(context).isEmpty()) {
                 FirebaseInitializer.initialize(context)
@@ -68,14 +68,14 @@ class FirestoreRepository private constructor(private val context: Context) {
         }
     }
 
-    val db: FirebaseFirestore? get() = getDb()
+    val db: FirebaseFirestore? get() = obtainDb()
 
     /**
      * Check cached song for Telegram CDN URL or existing metadata in cached_songs/{videoId}
      */
     suspend fun getCachedSong(videoId: String): Song? = withContext(Dispatchers.IO) {
         if (videoId.isBlank()) return@withContext null
-        val firestore = getDb() ?: return@withContext null
+        val firestore = obtainDb() ?: return@withContext null
         try {
             val doc = firestore.collection(COLLECTION_CACHED_SONGS).document(videoId).get().await()
             if (doc.exists()) {
@@ -108,7 +108,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun saveCachedSong(song: Song, telegramUrl: String? = null) = withContext(Dispatchers.IO) {
         if (song.id.isBlank()) return@withContext
-        val firestore = getDb() ?: return@withContext
+        val firestore = obtainDb() ?: return@withContext
         try {
             val effectiveTelegramUrl = telegramUrl ?: song.telegramUrl
             val data = hashMapOf(
@@ -138,7 +138,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun isSongLiked(userId: String, videoId: String): Boolean = withContext(Dispatchers.IO) {
         if (userId.isBlank() || videoId.isBlank()) return@withContext false
-        val firestore = getDb() ?: return@withContext false
+        val firestore = obtainDb() ?: return@withContext false
         try {
             val doc = firestore.collection(COLLECTION_USERS)
                 .document(userId)
@@ -155,7 +155,7 @@ class FirestoreRepository private constructor(private val context: Context) {
 
     suspend fun toggleLike(userId: String, song: Song): Boolean = withContext(Dispatchers.IO) {
         if (userId.isBlank() || song.id.isBlank()) return@withContext false
-        val firestore = getDb() ?: return@withContext false
+        val firestore = obtainDb() ?: return@withContext false
         try {
             val ref = firestore.collection(COLLECTION_USERS)
                 .document(userId)
@@ -192,7 +192,7 @@ class FirestoreRepository private constructor(private val context: Context) {
             return@callbackFlow
         }
 
-        val firestore = getDb()
+        val firestore = obtainDb()
         if (firestore == null) {
             trySend(emptyList())
             close()
@@ -230,7 +230,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun addToHistory(userId: String, song: Song) = withContext(Dispatchers.IO) {
         if (userId.isBlank() || song.id.isBlank()) return@withContext
-        val firestore = getDb() ?: return@withContext
+        val firestore = obtainDb() ?: return@withContext
         try {
             val data = hashMapOf(
                 "id" to song.id,
@@ -260,7 +260,7 @@ class FirestoreRepository private constructor(private val context: Context) {
             return@callbackFlow
         }
 
-        val firestore = getDb()
+        val firestore = obtainDb()
         if (firestore == null) {
             trySend(emptyList())
             close()
@@ -299,7 +299,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      * Ordered by latest added/updated so newly discovered and cached songs always show up first!
      */
     fun getCachedSongsFlow(limit: Int = 50): Flow<List<Song>> = callbackFlow {
-        val firestore = getDb()
+        val firestore = obtainDb()
         if (firestore == null) {
             trySend(emptyList())
             close()
@@ -340,7 +340,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      * Direct query of cached songs from Firestore database collection "cached_songs".
      */
     suspend fun getAllCachedSongs(limit: Int = 50): List<Song> = withContext(Dispatchers.IO) {
-        val firestore = getDb() ?: return@withContext emptyList()
+        val firestore = obtainDb() ?: return@withContext emptyList()
         try {
             val snapshot = firestore.collection(COLLECTION_CACHED_SONGS)
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
