@@ -482,10 +482,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    
-
-            handleSongEnded()
-        }
 
     private fun handleSongEnded() {
         if (isCrossfading) {
@@ -964,7 +960,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             } catch (e: Exception) {
                 Log.e("MusicViewModel", "Error playing audio: ${e.message}", e)
             }
-        }
 
         if (needsRealLyrics(song.lyricsLrc)) {
             fetchAndApplyLyrics(song)
@@ -1281,6 +1276,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             playbackForwardStack.clear()
         }
     }
+
+    fun cycleRepeatMode() = toggleRepeat()
 
     fun toggleRepeat() {
         _repeatMode.value = (_repeatMode.value + 1) % 3
