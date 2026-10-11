@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "564959689026",
+    "project_id": "resso-music-ad0cf",
+    "storage_bucket": "resso-music-ad0cf.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:564959689026:android:faa4c6af1c2ad24830f0db",
+        "android_client_info": {
+          "package_name": "com.resso.craka"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBjUTi9GJ6L1XH8qVFeU8dSbj4Nb6huyAU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

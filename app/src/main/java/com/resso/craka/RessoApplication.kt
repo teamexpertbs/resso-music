@@ -31,17 +31,9 @@ class RessoApplication : Application(), ImageLoaderFactory {
     override fun onCreate() {
         super.onCreate()
         
-        // Initialize Firebase (should auto-initialize from google-services.json)
+        // Initialize Firebase with guaranteed fallback options
         try {
-            Firebase.initialize(this)
-            Log.i(tag, "Firebase initialized from google-services.json")
-        } catch (e: Throwable) {
-            Log.w(tag, "Firebase initialization attempt: ${e.message}")
-        }
-        
-        // Verify Firebase is ready and log configuration
-        try {
-            FirebaseInitializer.initialize()
+            FirebaseInitializer.initialize(this)
             FirebaseInitializer.logConfiguration()
         } catch (e: Throwable) {
             Log.w(tag, "FirebaseInitializer: ${e.message}")

@@ -2,10 +2,12 @@ package com.resso.craka.data.repository
 
 import android.content.Context
 import android.util.Log
+import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
 import com.google.firebase.firestore.PersistentCacheSettings
 import com.google.firebase.firestore.SetOptions
+import com.resso.craka.data.firebase.FirebaseInitializer
 import com.resso.craka.data.model.Song
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.awaitClose
@@ -34,32 +36,48 @@ class FirestoreRepository private constructor(private val context: Context) {
         }
     }
 
-    val db: FirebaseFirestore by lazy {
-        val firestore = FirebaseFirestore.getInstance()
-        try {
-            val cacheSettings = PersistentCacheSettings.newBuilder()
-                .setSizeBytes(100L * 1024L * 1024L) // 100 MB offline persistence
-                .build()
+    /**
+     * Safely retrieves FirebaseFirestore instance, ensuring FirebaseApp is initialized.
+     * Never throws IllegalStateException if Firebase is initializing.
+     */
+    fun getDb(): FirebaseFirestore? {
+        return try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseInitializer.initialize(context)
+            }
+            if (FirebaseApp.getApps(context).isNotEmpty()) {
+                val firestore = FirebaseFirestore.getInstance()
+                try {
+                    val cacheSettings = PersistentCacheSettings.newBuilder()
+                        .setSizeBytes(100L * 1024L * 1024L) // 100 MB offline persistence
+                        .build()
 
-            val settings = FirebaseFirestoreSettings.Builder()
-                .setLocalCacheSettings(cacheSettings)
-                .build()
+                    val settings = FirebaseFirestoreSettings.Builder()
+                        .setLocalCacheSettings(cacheSettings)
+                        .build()
 
-            firestore.firestoreSettings = settings
-            Log.d(TAG, "Firestore persistent cache settings successfully enabled")
+                    firestore.firestoreSettings = settings
+                } catch (_: Exception) {}
+                firestore
+            } else {
+                null
+            }
         } catch (e: Exception) {
-            Log.w(TAG, "Note: Firestore settings already initialized or warning: ${e.message}")
+            Log.w(TAG, "Cannot get Firestore instance: ${e.message}")
+            null
         }
-        firestore
     }
+
+    val db: FirebaseFirestore? get() = getDb()
 
     /**
      * Check cached song for Telegram CDN URL or existing metadata in cached_songs/{videoId}
      */
     suspend fun getCachedSong(videoId: String): Song? = withContext(Dispatchers.IO) {
         if (videoId.isBlank()) return@withContext null
+        val firestore = getDb() ?: return@withContext null
         try {
-            val doc = db.collection(COLLECTION_CACHED_SONGS).document(videoId).get().await()
+            val doc = firestore.collection(COLLECTION_CACHED_SONGS).document(videoId).get().await()
             if (doc.exists()) {
                 val id = doc.getString("id") ?: videoId
                 val title = doc.getString("title") ?: ""
@@ -90,6 +108,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun saveCachedSong(song: Song, telegramUrl: String? = null) = withContext(Dispatchers.IO) {
         if (song.id.isBlank()) return@withContext
+        val firestore = getDb() ?: return@withContext
         try {
             val effectiveTelegramUrl = telegramUrl ?: song.telegramUrl
             val data = hashMapOf(
@@ -105,7 +124,7 @@ class FirestoreRepository private constructor(private val context: Context) {
                 data["telegram_url"] = effectiveTelegramUrl
             }
 
-            db.collection(COLLECTION_CACHED_SONGS).document(song.id)
+            firestore.collection(COLLECTION_CACHED_SONGS).document(song.id)
                 .set(data, SetOptions.merge())
                 .await()
             Log.d(TAG, "Saved song ${song.id} to cached_songs")
@@ -119,8 +138,9 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun isSongLiked(userId: String, videoId: String): Boolean = withContext(Dispatchers.IO) {
         if (userId.isBlank() || videoId.isBlank()) return@withContext false
+        val firestore = getDb() ?: return@withContext false
         try {
-            val doc = db.collection(COLLECTION_USERS)
+            val doc = firestore.collection(COLLECTION_USERS)
                 .document(userId)
                 .collection(SUBCOLLECTION_LIKED)
                 .document(videoId)
@@ -135,8 +155,9 @@ class FirestoreRepository private constructor(private val context: Context) {
 
     suspend fun toggleLike(userId: String, song: Song): Boolean = withContext(Dispatchers.IO) {
         if (userId.isBlank() || song.id.isBlank()) return@withContext false
+        val firestore = getDb() ?: return@withContext false
         try {
-            val ref = db.collection(COLLECTION_USERS)
+            val ref = firestore.collection(COLLECTION_USERS)
                 .document(userId)
                 .collection(SUBCOLLECTION_LIKED)
                 .document(song.id)
@@ -171,7 +192,14 @@ class FirestoreRepository private constructor(private val context: Context) {
             return@callbackFlow
         }
 
-        val listener = db.collection(COLLECTION_USERS)
+        val firestore = getDb()
+        if (firestore == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = firestore.collection(COLLECTION_USERS)
             .document(userId)
             .collection(SUBCOLLECTION_LIKED)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
@@ -202,6 +230,7 @@ class FirestoreRepository private constructor(private val context: Context) {
      */
     suspend fun addToHistory(userId: String, song: Song) = withContext(Dispatchers.IO) {
         if (userId.isBlank() || song.id.isBlank()) return@withContext
+        val firestore = getDb() ?: return@withContext
         try {
             val data = hashMapOf(
                 "id" to song.id,
@@ -213,7 +242,7 @@ class FirestoreRepository private constructor(private val context: Context) {
                 "timestamp" to System.currentTimeMillis()
             )
 
-            db.collection(COLLECTION_USERS)
+            firestore.collection(COLLECTION_USERS)
                 .document(userId)
                 .collection(SUBCOLLECTION_HISTORY)
                 .document(song.id)
@@ -231,7 +260,14 @@ class FirestoreRepository private constructor(private val context: Context) {
             return@callbackFlow
         }
 
-        val listener = db.collection(COLLECTION_USERS)
+        val firestore = getDb()
+        if (firestore == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = firestore.collection(COLLECTION_USERS)
             .document(userId)
             .collection(SUBCOLLECTION_HISTORY)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
@@ -263,7 +299,14 @@ class FirestoreRepository private constructor(private val context: Context) {
      * Ordered by latest added/updated so newly discovered and cached songs always show up first!
      */
     fun getCachedSongsFlow(limit: Int = 50): Flow<List<Song>> = callbackFlow {
-        val listener = db.collection(COLLECTION_CACHED_SONGS)
+        val firestore = getDb()
+        if (firestore == null) {
+            trySend(emptyList())
+            close()
+            return@callbackFlow
+        }
+
+        val listener = firestore.collection(COLLECTION_CACHED_SONGS)
             .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
             .limit(limit.toLong())
             .addSnapshotListener { snapshot, error ->
@@ -297,8 +340,9 @@ class FirestoreRepository private constructor(private val context: Context) {
      * Direct query of cached songs from Firestore database collection "cached_songs".
      */
     suspend fun getAllCachedSongs(limit: Int = 50): List<Song> = withContext(Dispatchers.IO) {
+        val firestore = getDb() ?: return@withContext emptyList()
         try {
-            val snapshot = db.collection(COLLECTION_CACHED_SONGS)
+            val snapshot = firestore.collection(COLLECTION_CACHED_SONGS)
                 .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
                 .limit(limit.toLong())
                 .get()

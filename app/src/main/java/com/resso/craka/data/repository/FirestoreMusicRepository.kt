@@ -30,7 +30,14 @@ class FirestoreMusicRepository(
 
     private val firestore: FirebaseFirestore? by lazy {
         try {
-            FirebaseFirestore.getInstance()
+            if (com.google.firebase.FirebaseApp.getApps(context).isEmpty()) {
+                com.resso.craka.data.firebase.FirebaseInitializer.initialize(context)
+            }
+            if (com.google.firebase.FirebaseApp.getApps(context).isNotEmpty()) {
+                FirebaseFirestore.getInstance()
+            } else {
+                null
+            }
         } catch (e: Exception) {
             Log.w(TAG, "Firestore instance not ready: ${e.message}")
             null

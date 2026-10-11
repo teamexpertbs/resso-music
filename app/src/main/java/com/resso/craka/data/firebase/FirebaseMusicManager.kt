@@ -33,6 +33,9 @@ class FirebaseMusicManager(private val context: Context) {
 
     private val firestore: FirebaseFirestore? by lazy {
         try {
+            if (FirebaseApp.getApps(context).isEmpty()) {
+                FirebaseInitializer.initialize(context)
+            }
             if (FirebaseApp.getApps(context).isNotEmpty()) {
                 FirebaseFirestore.getInstance()
             } else {
