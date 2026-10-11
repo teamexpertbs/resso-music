@@ -28,25 +28,21 @@ object FirebaseInitializer {
      */
     fun initialize(context: Context? = null): Boolean {
         try {
-            val app = if (context != null) {
-                if (FirebaseApp.getApps(context).isEmpty()) {
-                    val options = FirebaseOptions.Builder()
-                        .setApplicationId(APPLICATION_ID)
-                        .setApiKey(API_KEY)
-                        .setProjectId(PROJECT_ID)
-                        .setStorageBucket(STORAGE_BUCKET)
-                        .build()
-                    FirebaseApp.initializeApp(context.applicationContext, options)
-                    Log.i(TAG, "Firebase initialized with programmatic FirebaseOptions")
-                } else {
-                    FirebaseApp.getInstance()
-                }
-            } else {
-                try {
-                    FirebaseApp.getInstance()
-                } catch (_: Exception) {
-                    null
-                }
+            if (context != null && FirebaseApp.getApps(context).isEmpty()) {
+                val options = FirebaseOptions.Builder()
+                    .setApplicationId(APPLICATION_ID)
+                    .setApiKey(API_KEY)
+                    .setProjectId(PROJECT_ID)
+                    .setStorageBucket(STORAGE_BUCKET)
+                    .build()
+                FirebaseApp.initializeApp(context.applicationContext, options)
+                Log.i(TAG, "Firebase initialized with programmatic FirebaseOptions fallback")
+            }
+
+            val app: FirebaseApp? = try {
+                FirebaseApp.getInstance()
+            } catch (_: Exception) {
+                null
             }
 
             if (app != null) {
