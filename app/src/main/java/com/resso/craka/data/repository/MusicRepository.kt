@@ -357,3 +357,4 @@ class MusicRepository(context: Context) {
             Log.w("MusicRepository", "Online trending fetch note: ${e.message}")
         }
     }
+}
