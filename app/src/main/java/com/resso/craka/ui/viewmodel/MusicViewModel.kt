@@ -33,7 +33,6 @@ import com.resso.craka.data.model.VibeEntity
 import com.resso.craka.data.model.toSong
 import com.resso.craka.flash.FlashSyncManager
 import com.resso.craka.player.AppEqualizer
-import com.resso.craka.player.StreamPlayerManager
 import com.resso.craka.util.LyricsParser
 import com.resso.craka.util.SongDeduplicator
 import com.resso.craka.util.deduplicate
@@ -54,7 +53,6 @@ import kotlinx.coroutines.launch
 class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private val repository = (application as RessoApplication).repository
     val flashSyncManager = FlashSyncManager(application)
-    val streamPlayerManager = StreamPlayerManager(application)
     val eightDAudioProcessor = Spatial8DAudioProcessor()
     val beatDetectionAudioProcessor = BeatDetectionAudioProcessor {
         flashSyncManager.pulseOnce()
@@ -99,13 +97,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             setEnableDecoderFallback(true)
             setMediaCodecSelector(audioMediaCodecSelector)
         }
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(15000)
-            .setReadTimeoutMs(15000)
-        val dataSourceFactory = DefaultDataSource.Factory(application, httpDataSourceFactory)
-        val mediaSourceFactory = DefaultMediaSourceFactory(dataSourceFactory)
+        val cacheDataSourceFactory = com.resso.craka.player.ExoPlayerCacheManager.buildCacheDataSourceFactory(application)
+        val mediaSourceFactory = DefaultMediaSourceFactory(cacheDataSourceFactory)
 
         ExoPlayer.Builder(application, renderersFactory)
             .setMediaSourceFactory(mediaSourceFactory)
@@ -214,12 +207,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     fun toggleVideoMode() {
         _isVideoMode.value = !_isVideoMode.value
-        streamPlayerManager.setHighQuality(_isVideoMode.value)
     }
 
     fun setVideoMode(enabled: Boolean) {
         _isVideoMode.value = enabled
-        streamPlayerManager.setHighQuality(enabled)
     }
 
     private val _isLyricsVisible = MutableStateFlow(false)
@@ -429,26 +420,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         PlaybackService.commands.onNext = { playNextSong() }
         PlaybackService.commands.onPrevious = { playPreviousSong() }
         PlaybackService.commands.onSeek = { seekTo(it) }
-        com.resso.craka.player.YouTubeMusicPlayerManager.onSongEnded = { playNextSong() }
-        com.resso.craka.player.YouTubeMusicPlayerManager.onPlaybackStateChanged = { playing ->
-            _isPlaying.value = playing
-            _isPlayingLiveData.postValue(playing)
-            publishPlayback(playing)
-        }
-        viewModelScope.launch {
-            com.resso.craka.player.YouTubeMusicPlayerManager.currentPositionSec.collect { sec ->
-                if (isYouTubeSong(_currentSong.value)) {
-                    _currentPositionMs.value = (sec * 1000).toLong()
-                }
-            }
-        }
-        viewModelScope.launch {
-            com.resso.craka.player.YouTubeMusicPlayerManager.totalDurationSec.collect { sec ->
-                if (isYouTubeSong(_currentSong.value) && sec > 0) {
-                    _durationMs.value = (sec * 1000).toLong()
-                }
-            }
-        }
         _recentSongs.value = repository.recentSongs()
         _searchHistory.value = playerPrefs.getString("search_history", "")
             .orEmpty()
@@ -457,11 +428,19 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _isShuffle.value = playerPrefs.getBoolean("shuffle", false)
         _repeatMode.value = playerPrefs.getInt("repeat", 0)
         setupPlayerListener()
-        setupStreamListener()
         startProgressTracking()
         loadTrendingSongs()
         loadHomeRows()
         setupNetworkConnectivityListener()
+        viewModelScope.launch {
+            firestoreRepository.getCachedSongsFlow(60).collect { cachedList ->
+                if (cachedList.isNotEmpty() && _songsList.value.isNullOrEmpty()) {
+                    _songsList.value = cachedList
+                    songsListFlow.value = cachedList
+                    _trendingSongs.value = cachedList.map { it.toSongEntity() }
+                }
+            }
+        }
     }
 
     private fun setupNetworkConnectivityListener() {
@@ -503,82 +482,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         }
     }
 
-    fun isYouTubeSong(song: SongEntity?): Boolean {
-        if (song == null) return false
-        val audioUrl = song.audioUrl.lowercase()
-        // If it's a verifiable direct audio file or Telegram CDN stream
-        if (!audioUrl.contains("vercel.app") && (
-            audioUrl.contains("telegram.org") ||
-            audioUrl.endsWith(".mp4") ||
-            audioUrl.endsWith(".mp3") ||
-            audioUrl.endsWith(".m4a") ||
-            audioUrl.contains(".mp4?") ||
-            audioUrl.contains(".mp3?") ||
-            audioUrl.contains(".m4a?")
-        )) {
-            return false
-        }
-        return true
-    }
+    
 
-    private fun isUsingStreamPlayer(song: SongEntity?): Boolean {
-        if (song == null) return false
-        return song.audioUrl.isBlank() && song.id.startsWith("yt_")
-    }
-
-    private fun setupStreamListener() {
-        streamPlayerManager.onVideoEnded = {
             handleSongEnded()
         }
-
-        viewModelScope.launch {
-            streamPlayerManager.isPlaying.collect { streamPlaying ->
-                val song = _currentSong.value
-                if (isUsingStreamPlayer(song)) {
-                    if (streamPlaying || !streamPlayerManager.wantsBackgroundPlayback()) {
-                        _isPlaying.value = streamPlaying
-                        publishPlayback(streamPlaying)
-                    }
-                    if (streamPlaying && _isFlashSyncEnabled.value) {
-                        flashSyncManager.startFallbackRhythm()
-                    } else if (!streamPlaying && !player.isPlaying) {
-                        flashSyncManager.stopSync()
-                    }
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            streamPlayerManager.currentTimeMs.collect { streamPos ->
-                val song = _currentSong.value
-                if (isUsingStreamPlayer(song)) {
-                    _currentPositionMs.value = streamPos
-                    val currentLyrics = _lyrics.value
-                    if (currentLyrics.isNotEmpty()) {
-                        updateLyricIndex(streamPos)
-                    }
-
-                    // Seamless Crossfade & DJ Transition in last 3.5s
-                    if (_isCrossfadeEnabled.value && _isPlaying.value && _durationMs.value > 15_000L && !isCrossfading && !crossfadeTriggeredForCurrentSong) {
-                        val remainingMs = _durationMs.value - streamPos
-                        if (remainingMs in 500L..3500L) {
-                            crossfadeTriggeredForCurrentSong = true
-                            triggerCrossfade()
-                        }
-                    }
-                }
-            }
-        }
-
-        viewModelScope.launch {
-            streamPlayerManager.durationMs.collect { streamDur ->
-                val song = _currentSong.value
-                if (isUsingStreamPlayer(song) && streamDur > 1000L) {
-                    _durationMs.value = streamDur
-                }
-            }
-        }
-    }
 
     private fun handleSongEnded() {
         if (isCrossfading) {
@@ -594,12 +501,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun restartCurrentSong() {
         seekTo(0)
-        val song = _currentSong.value ?: return
-        if (isUsingStreamPlayer(song)) {
-            streamPlayerManager.play()
-        } else {
-            player.play()
-        }
+        player.play()
         _isPlaying.value = true
     }
 
@@ -625,15 +527,26 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadTrendingSongs() {
         viewModelScope.launch(Dispatchers.IO) {
             try {
+                // 1. Immediately check Firestore database for cached songs
+                val firestoreCached = firestoreRepository.getAllCachedSongs(50)
+                if (firestoreCached.isNotEmpty()) {
+                    withContext(Dispatchers.Main) {
+                        if (_songsList.value.isNullOrEmpty()) {
+                            _songsList.value = firestoreCached
+                            songsListFlow.value = firestoreCached
+                            _trendingSongs.value = firestoreCached.map { it.toSongEntity() }
+                        }
+                    }
+                }
+
+                // 2. Dynamic fetch from repository (Firestore database + live YouTube Music hits)
                 val trending = repository.getTrendingSongs()
                 if (trending.isNotEmpty()) {
+                    val converted = trending.map { it.toSong() }
                     withContext(Dispatchers.Main) {
                         _trendingSongs.value = trending
-                        if (_songsList.value.isNullOrEmpty()) {
-                            val converted = trending.map { it.toSong() }
-                            _songsList.value = converted
-                            songsListFlow.value = converted
-                        }
+                        _songsList.value = converted
+                        songsListFlow.value = converted
                         if (playbackQueue.value.isEmpty()) {
                             val (shuffledQueue, _) = if (_isShuffle.value) {
                                 shuffleEngine.onNewSongsFetched(emptyList(), trending, null)
@@ -829,12 +742,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
             override fun onIsPlayingChanged(playing: Boolean) {
                 val song = _currentSong.value
-                if (!isUsingStreamPlayer(song)) {
+                if (true) {
                     _isPlaying.value = playing
                     if (playing && _isFlashSyncEnabled.value) {
                         flashSyncManager.startDirectSync()
                         beatDetectionAudioProcessor.isEnabled = true
-                    } else if (!playing && !streamPlayerManager.isPlaying.value) {
                         beatDetectionAudioProcessor.isEnabled = false
                         flashSyncManager.stopSync()
                     }
@@ -847,7 +759,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
             override fun onPlaybackStateChanged(state: Int) {
                 val song = _currentSong.value
-                if (!isUsingStreamPlayer(song)) {
+                if (true) {
                     if (state == Player.STATE_READY) {
                         exoErrorCount = 0
                         _durationMs.value = player.duration.coerceAtLeast(1L)
@@ -917,7 +829,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         progressJob = viewModelScope.launch {
             while (isActive) {
                 val song = _currentSong.value
-                if (!isUsingStreamPlayer(song) && player.isPlaying) {
+                if (player.isPlaying) {
                     val pos = player.currentPosition
                     _currentPositionMs.value = pos
                     val dur = player.duration
@@ -1038,31 +950,8 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         observeCommentsForSong(song.id)
 
         _isVideoMode.value = false
-        if (isYouTubeSong(song)) {
-            try { player.pause() } catch (_: Exception) {}
-            try {
-                streamPlayerManager.pause()
-                streamPlayerManager.setKeepPlayingInBackground(false)
-            } catch (_: Exception) {}
-            _streamVisible.value = false
-            if (autoPlay) {
-                com.resso.craka.player.YouTubeMusicPlayerManager.playSong(song)
-                _isPlaying.value = true
-                _isPlayingLiveData.value = true
-            }
-        } else if (isUsingStreamPlayer(song)) {
-            try { player.pause() } catch (_: Exception) {}
-            _streamVisible.value = true
-            streamPlayerManager.loadAndPlay(song.id.removePrefix("yt_"), autoPlay)
-            _isPlaying.value = autoPlay
-        } else {
-            try {
-                streamPlayerManager.pause()
-                streamPlayerManager.setKeepPlayingInBackground(false)
-            } catch (_: Exception) {}
-            if (_isFlashSyncEnabled.value && _isPlaying.value) flashSyncManager.startDirectSync()
-            _streamVisible.value = false
-            try {
+        _streamVisible.value = false
+        try {
                 val mediaItem = MediaItem.fromUri(mediaUri(song.audioUrl))
                 player.setMediaItem(mediaItem)
                 player.prepare()
@@ -1097,9 +986,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
 
     private fun publishPlayback(playing: Boolean = _isPlaying.value) {
         val song = _currentSong.value ?: return
-        if (playing && isUsingStreamPlayer(song)) {
-            streamPlayerManager.setKeepPlayingInBackground(true)
-        }
         PlaybackService.update(
             context = getApplication(),
             title = song.title,
@@ -1112,40 +998,22 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         )
     }
 
-    private fun resumePlayback() {
+    fun resumePlayback() {
         val song = _currentSong.value ?: return
-        if (isYouTubeSong(song)) {
-            com.resso.craka.player.YouTubeMusicPlayerManager.resume()
+        if (!player.isPlaying) {
+            player.play()
             _isPlaying.value = true
             _isPlayingLiveData.value = true
-        } else if (isUsingStreamPlayer(song)) {
-            streamPlayerManager.setKeepPlayingInBackground(true)
-            streamPlayerManager.play()
-            _isPlaying.value = true
-        } else {
-            if (!player.isPlaying) {
-                player.play()
-                _isPlaying.value = true
-            }
         }
         publishPlayback(true)
     }
 
-    private fun pausePlayback() {
+    fun pausePlayback() {
         val song = _currentSong.value ?: return
         wasPlayingBeforeNetworkLost = false
-        if (isYouTubeSong(song)) {
-            com.resso.craka.player.YouTubeMusicPlayerManager.pause()
-            _isPlaying.value = false
-            _isPlayingLiveData.value = false
-        } else if (isUsingStreamPlayer(song)) {
-            streamPlayerManager.setKeepPlayingInBackground(false)
-            streamPlayerManager.pause()
-            _isPlaying.value = false
-        } else {
-            player.pause()
-            _isPlaying.value = false
-        }
+        player.pause()
+        _isPlaying.value = false
+        _isPlayingLiveData.value = false
         playerPrefs.edit()
             .putString("last_played_song_id", song.id)
             .putLong("last_position_ms", _currentPositionMs.value)
@@ -1163,34 +1031,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun togglePlayPause() {
-        val song = _currentSong.value ?: return
-        if (isYouTubeSong(song)) {
-            com.resso.craka.player.YouTubeMusicPlayerManager.togglePlayPause()
-            val playing = com.resso.craka.player.YouTubeMusicPlayerManager.isPlaying.value
-            _isPlaying.value = playing
-            _isPlayingLiveData.value = playing
-            publishPlayback(playing)
-            return
-        } else if (isUsingStreamPlayer(song)) {
-            val playing = _isPlaying.value || streamPlayerManager.isPlaying.value
-            if (playing) pausePlayback() else resumePlayback()
-            return
-        } else if (player.isPlaying) {
-            player.pause()
-            _isPlaying.value = false
-            playerPrefs.edit()
-                .putString("last_played_song_id", song.id)
-                .putLong("last_position_ms", _currentPositionMs.value)
-                .apply()
+        if (player.isPlaying) {
+            pausePlayback()
         } else {
-            player.play()
-            _isPlaying.value = true
-            playerPrefs.edit()
-                .putString("last_played_song_id", song.id)
-                .putLong("last_position_ms", _currentPositionMs.value)
-                .apply()
+            resumePlayback()
         }
-        publishPlayback(_isPlaying.value)
     }
 
     private var lastNextSongSkipTimeMs = 0L
@@ -1421,16 +1266,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun seekTo(positionMs: Long) {
-        _currentPositionMs.value = positionMs
-        val song = _currentSong.value
-        if (isYouTubeSong(song)) {
-            com.resso.craka.player.YouTubeMusicPlayerManager.seekTo(positionMs / 1000f)
-        } else if (isUsingStreamPlayer(song)) {
-            streamPlayerManager.seekTo(positionMs)
-        } else {
-            player.seekTo(positionMs)
-        }
-        playerPrefs.edit().putLong("last_position_ms", positionMs).apply()
+        val safePos = positionMs.coerceAtLeast(0L)
+        _currentPositionMs.value = safePos
+        player.seekTo(safePos)
+        playerPrefs.edit().putLong("last_position_ms", safePos).apply()
+        publishPlayback(_isPlaying.value)
     }
 
     fun toggleShuffle() {
@@ -1503,22 +1343,14 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun toggleFlashSync() {
         val newState = !_isFlashSyncEnabled.value
         _isFlashSyncEnabled.value = newState
-        val song = _currentSong.value
-        val isStream = isUsingStreamPlayer(song)
-        if (newState && (_isPlaying.value || streamPlayerManager.isPlaying.value)) {
-            if (isStream) {
-                beatDetectionAudioProcessor.isEnabled = false
-                flashSyncManager.startFallbackRhythm()
-                _networkStatusMessage.value = "⚡ Flash Beat Sync: ON (Estimated rhythm pulse for stream)"
-            } else {
-                flashSyncManager.startDirectSync()
-                beatDetectionAudioProcessor.isEnabled = true
-                _networkStatusMessage.value = "⚡ Flash Beat Sync: ON (Direct PCM Hardware Beat Detection)"
-            }
+        if (newState) {
+            flashSyncManager.startDirectSync()
+            beatDetectionAudioProcessor.isEnabled = true
+            _networkStatusMessage.value = "⚡ Flash Beat Sync: ON (Direct PCM Hardware Beat Detection)"
         } else {
             beatDetectionAudioProcessor.isEnabled = false
             flashSyncManager.stopSync()
-            _networkStatusMessage.value = if (!newState) "Flash Beat Sync: OFF" else "Flash Beat Sync: Ready (play music to start)"
+            _networkStatusMessage.value = "Flash Beat Sync: OFF"
         }
     }
 
@@ -1553,7 +1385,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         _isVolumeBoosterEnabled.value = newState
         player.volume = 1.0f
         applyVolumeBooster()
-        streamPlayerManager.setBoost(newState)
         _networkStatusMessage.value = if (newState) "Volume Booster: +6 dB Active (Safe Boost)" else "Volume Booster: Normal"
     }
 
@@ -1701,13 +1532,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 if (sec in 1..20) {
                     val factor = sec / 20.0f
                     player.volume = factor
-                    streamPlayerManager.setVolume((factor * 100).toInt())
                 }
                 kotlinx.coroutines.delay(1_000)
             }
             pausePlayback()
             player.volume = 1.0f
-            streamPlayerManager.setVolume(100)
             _sleepMinutesLeft.value = 0
             _networkStatusMessage.value = "🌙 Sleep Timer finished - Goodnight!"
         }
@@ -1716,7 +1545,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     fun cancelSleepTimer() {
         sleepJob?.cancel()
         player.volume = 1.0f
-        streamPlayerManager.setVolume(100)
         _sleepMinutesLeft.value = 0
         _networkStatusMessage.value = "Sleep Timer cancelled"
     }
@@ -1725,7 +1553,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         val next = !_is8DAudioEnabled.value
         _is8DAudioEnabled.value = next
         eightDAudioProcessor.is8DEnabled = next
-        streamPlayerManager.set8DAudio(next)
         if (next) {
             _networkStatusMessage.value = "🎧 8D Spatial Audio: ON (360° Binaural Orbit Panning)"
         } else {
@@ -1751,7 +1578,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                     if (sleepJob?.isActive == true && _sleepMinutesLeft.value <= 1) break
                     val vol = step / 4f
                     player.volume = vol
-                    streamPlayerManager.setVolume((vol * 100).toInt())
                     kotlinx.coroutines.delay(600)
                 }
                 playNextSong()
@@ -1760,13 +1586,11 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
                 for (vol in fadeSteps) {
                     if (sleepJob?.isActive == true && _sleepMinutesLeft.value <= 1) break
                     player.volume = vol
-                    streamPlayerManager.setVolume((vol * 100).toInt())
                     kotlinx.coroutines.delay(350)
                 }
             } finally {
                 if (sleepJob?.isActive != true || _sleepMinutesLeft.value > 1) {
                     player.volume = 1.0f
-                    streamPlayerManager.setVolume(100)
                 }
                 isCrossfading = false
             }
@@ -1786,7 +1610,7 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
             return
         }
         val song = _currentSong.value
-        if (song == null || isUsingStreamPlayer(song)) {
+        if (song == null) {
             appEqualizer.apply("Off")
             return
         }
@@ -1829,9 +1653,10 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
     private fun loadHomeRows() {
         viewModelScope.launch {
             allSongs.collect { local ->
-                _homeRows.value = buildHomeRows(local)
-                if (_currentSong.value == null && local.isNotEmpty()) {
-                    restoreLastPlaybackOrInitial(local)
+                val nonDummyLocal = local.filter { !it.id.startsWith("saavn_") && !it.id.startsWith("yt_sample_") }
+                _homeRows.value = buildHomeRows(nonDummyLocal)
+                if (_currentSong.value == null && nonDummyLocal.isNotEmpty()) {
+                    restoreLastPlaybackOrInitial(nonDummyLocal)
                 }
             }
         }
@@ -1874,7 +1699,6 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         commentsJob?.cancel()
         flashSyncManager.release()
         player.release()
-        streamPlayerManager.release()
         PlaybackService.commands.onPlay = null
         PlaybackService.commands.onPause = null
         PlaybackService.commands.onNext = null
@@ -1976,7 +1800,12 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         com.resso.craka.data.repository.FirestoreRepository.getInstance(getApplication())
     }
 
-    val firestoreLikedSongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
+        val firestoreCachedSongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
+        firestoreRepository.getCachedSongsFlow(60)
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    }
+
+val firestoreLikedSongs: StateFlow<List<com.resso.craka.data.model.Song>> by lazy {
         firestoreRepository.getLikedSongsFlow("user_default")
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
     }
@@ -2000,23 +1829,44 @@ class MusicViewModel(application: Application) : AndroidViewModel(application) {
         viewModelScope.launch(Dispatchers.IO) {
             var finalSong = song
             try {
+                // 1. Check if song already exists in Firestore cached_songs with direct Telegram CDN URL
                 val cached = firestoreRepository.getCachedSong(song.id)
                 if (cached != null && !cached.telegramUrl.isNullOrBlank()) {
-                    finalSong = finalSong.copy(telegramUrl = cached.telegramUrl)
+                    Log.d("MusicViewModel", "Streaming from Telegram CDN: ${cached.telegramUrl}")
+                    finalSong = finalSong.copy(
+                        telegramUrl = cached.telegramUrl,
+                        streamUrl = cached.telegramUrl!!,
+                        playUrl = cached.telegramUrl!!
+                    )
                 } else {
+                    // 2. Song not in Telegram yet: Stream via Vercel direct audio URL & save to Firestore
+                    val defaultPlayUrl = if (finalSong.playUrl.isNotBlank() && !finalSong.playUrl.contains("youtu")) {
+                        finalSong.playUrl
+                    } else {
+                        "https://music-api-lime-nine.vercel.app/play/${finalSong.id}"
+                    }
+                    finalSong = finalSong.copy(
+                        playUrl = defaultPlayUrl,
+                        streamUrl = defaultPlayUrl
+                    )
                     firestoreRepository.saveCachedSong(finalSong)
+
+                    // 3. Background Telegram upload: Send audio to channel & cache URL in Firestore for 0.1s instant future plays
+                    viewModelScope.launch(Dispatchers.IO) {
+                        try {
+                            val tgUrl = com.resso.craka.data.telegram.TelegramHelper.uploadAndCacheSong(finalSong, defaultPlayUrl)
+                            if (!tgUrl.isNullOrBlank()) {
+                                Log.i("MusicViewModel", "Saved new Telegram CDN URL to Firestore for song ${finalSong.id}")
+                                firestoreRepository.saveCachedSong(finalSong, tgUrl)
+                            }
+                        } catch (e: Exception) {
+                            Log.w("MusicViewModel", "Background Telegram upload notice: ${e.message}")
+                        }
+                    }
                 }
                 firestoreRepository.addToHistory("user_default", finalSong)
             } catch (e: Exception) {
                 Log.w("MusicViewModel", "Firestore caching note: ${e.message}")
-            }
-
-            // If Telegram URL is present, prioritize it as direct stream URL
-            if (!finalSong.telegramUrl.isNullOrBlank()) {
-                finalSong = finalSong.copy(
-                    streamUrl = finalSong.telegramUrl!!,
-                    playUrl = finalSong.telegramUrl!!
-                )
             }
 
             withContext(Dispatchers.Main) {

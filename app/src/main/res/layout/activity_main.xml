@@ -284,19 +284,4 @@
         </LinearLayout>
     </androidx.cardview.widget.CardView>
 
-    <!-- YouTube Player View (Standard dimensions >200dp and visible for YouTube IFrame API compliance, 0.002 alpha behind views so AMOLED black UI is maintained) -->
-    <FrameLayout
-        android:id="@+id/youtubePlayerContainer"
-        android:layout_width="match_parent"
-        android:layout_height="220dp"
-        android:layout_alignParentBottom="true"
-        android:alpha="0.002"
-        android:visibility="visible">
-
-        <com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
-            android:id="@+id/youtubePlayerView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-    </FrameLayout>
-
 </RelativeLayout>

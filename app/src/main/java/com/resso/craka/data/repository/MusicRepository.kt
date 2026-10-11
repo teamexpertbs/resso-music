@@ -37,9 +37,9 @@ class MusicRepository(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 songDao.purgeLocalSongs()
-                seedInitialDataIfEmpty()
+                songDao.purgeDummySongs()
+                fetchAndSeedDynamicSongsFromDatabase()
                 songDao.clearPlaceholderLyrics()
-                updateDefaultStreamsIfEmpty()
                 syncFromCloud()
             } catch (t: Throwable) {
                 Log.e("MusicRepository", "Background init error: ${t.message}", t)
@@ -114,6 +114,27 @@ class MusicRepository(context: Context) {
     }
 
     suspend fun getTrendingSongs(): List<SongEntity> {
+        // 1. Try dynamic songs from Firestore database first
+        try {
+            val dynamicFirestore = com.resso.craka.util.SongDeduplicator.deduplicateList(firestoreMusicRepo.getDynamicSongs(35))
+            if (dynamicFirestore.isNotEmpty()) {
+                songDao.insertSongs(dynamicFirestore)
+                return dynamicFirestore.shuffled()
+            }
+        } catch (_: Exception) {}
+
+        // 2. Try Firestore cached_songs
+        try {
+            val firestoreRepo = FirestoreRepository.getInstance(appContext)
+            val cached = firestoreRepo.getAllCachedSongs(35)
+            if (cached.isNotEmpty()) {
+                val entities = com.resso.craka.util.SongDeduplicator.deduplicateList(cached.map { it.toSongEntity() })
+                songDao.insertSongs(entities)
+                return entities.shuffled()
+            }
+        } catch (_: Exception) {}
+
+        // 3. Query live YouTube Music API via Vercel for fresh hits
         try {
             val fresh = com.resso.craka.util.SongDeduplicator.deduplicateList(searchService.getTrendingSongs(35))
             if (fresh.isNotEmpty()) {
@@ -123,15 +144,9 @@ class MusicRepository(context: Context) {
             }
         } catch (_: Exception) {}
 
-        try {
-            val dynamicFirestore = com.resso.craka.util.SongDeduplicator.deduplicateList(firestoreMusicRepo.getDynamicSongs(30))
-            if (dynamicFirestore.isNotEmpty()) {
-                songDao.insertSongs(dynamicFirestore)
-                return dynamicFirestore.shuffled()
-            }
-        } catch (_: Exception) {}
-
-        return com.resso.craka.util.SongDeduplicator.deduplicateList(songDao.getInitialSongsSync()).shuffled()
+        // 4. Return any existing non-dummy songs from local DB
+        val local = songDao.getInitialSongsSync().filter { !it.id.startsWith("saavn_") && !it.id.startsWith("yt_sample_") }
+        return com.resso.craka.util.SongDeduplicator.deduplicateList(local).shuffled()
     }
 
     fun peekTrending(): List<SongEntity> = emptyList()
@@ -279,19 +294,14 @@ class MusicRepository(context: Context) {
 
     private suspend fun updateDefaultStreamsIfEmpty() {
         val streamMap = mapOf(
-            "saavn_payal" to "https://aac.saavncdn.com/173/ad5df053bfb2a4755cbb6c74e6183406_320.mp4",
-            "saavn_tauba_tauba" to "https://aac.saavncdn.com/992/5d44da8bc1d78fb72d18b701d758fd1f_320.mp4",
-            "saavn_aaj_ki_raat" to "https://aac.saavncdn.com/373/36b1b3637cdeedfaa9a9012453948aa6_320.mp4",
-            "saavn_kesariya" to "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
-            "saavn_millionaire" to "https://aac.saavncdn.com/173/4528cbe9b2ceba863a8e2e92c2da2882_320.mp4",
-            "yt_IJq0yyWug1k" to "https://aac.saavncdn.com/264/3df8a213e4b7858cfa9900c430fa728c_320.mp4",
-            "yt_5Eqb_-j3FDA" to "https://aac.saavncdn.com/392/689a74aa9bc3b624b45ce7508cf31c77_320.mp4",
-            "yt_ElZfdU54Cp8" to "https://aac.saavncdn.com/308/879685a21eb234c98e169527ecb82b6b_320.mp4",
-            "yt_Wv2rLZmbPMA" to "https://aac.saavncdn.com/475/8863f6087b32d326dae004a600d9a690_320.mp4",
-            "yt_VNs_cCtdbPc" to "https://aac.saavncdn.com/973/7710b144cb742f1cf59f5b610c144a6d_320.mp4",
-            "yt_BddP6PYo2gs" to "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
-            "yt_n_FCrCQ6-9U" to "https://aac.saavncdn.com/431/e4f20532454a85fa0a94460f4eb78996_320.mp4",
-            "yt_mH_LFkWxpI0" to "https://aac.saavncdn.com/745/e4db870813e3bc3101d2ae0a09e0722c_320.mp4"
+            "a-PAcmi5Kas" to "https://music-api-lime-nine.vercel.app/play/a-PAcmi5Kas",
+            "IJq0yyWug1k" to "https://music-api-lime-nine.vercel.app/play/IJq0yyWug1k",
+            "5Eqb_-j3FDA" to "https://music-api-lime-nine.vercel.app/play/5Eqb_-j3FDA",
+            "ElZfdU54Cp8" to "https://music-api-lime-nine.vercel.app/play/ElZfdU54Cp8",
+            "Wv2rLZmbPMA" to "https://music-api-lime-nine.vercel.app/play/Wv2rLZmbPMA",
+            "BddP6PYo2gs" to "https://music-api-lime-nine.vercel.app/play/BddP6PYo2gs",
+            "n_FCrCQ6-9U" to "https://music-api-lime-nine.vercel.app/play/n_FCrCQ6-9U",
+            "mH_LFkWxpI0" to "https://music-api-lime-nine.vercel.app/play/mH_LFkWxpI0"
         )
         for ((id, url) in streamMap) {
             val song = songDao.getSongById(id)
@@ -301,300 +311,50 @@ class MusicRepository(context: Context) {
         }
     }
 
-    private suspend fun seedInitialDataIfEmpty() {
-        val sampleSongs = listOf(
-            SongEntity(
-                id = "saavn_payal",
-                title = "Payal",
-                artist = "Yo Yo Honey Singh, Paradox",
-                album = "GLORY",
-                durationMs = 221000L,
-                audioUrl = "https://aac.saavncdn.com/173/ad5df053bfb2a4755cbb6c74e6183406_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Yo Yo Honey Singh! Paradox!)
-                    [00:05.00] Chhan chhan chhan chhan baaje payal
-                    [00:10.00] Teri chhan chhan ne kar daala ghayal
-                    [00:15.00] Aankhon mein surma, kaano mein baali
-                    [00:20.00] Lagti hai tu toh qaatil niraali
-                    [00:25.00] Chhan chhan baaje payal teri
-                    [00:30.00] Loot gayi duniya saari meri
-                    [00:35.00] Baby chal mere sang thoda jhoom le
-                    [00:40.00] Aaj ki raat saare gham bhool le
-                """.trimIndent(),
-                genre = "Desi Hip-Hop",
-                mood = "Party",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "saavn_tauba_tauba",
-                title = "Tauba Tauba",
-                artist = "Karan Aujla",
-                album = "Bad Newz",
-                durationMs = 208000L,
-                audioUrl = "https://aac.saavncdn.com/992/5d44da8bc1d78fb72d18b701d758fd1f_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/992/Bad-Newz-Hindi-2024-20250730113701-500x500.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Yeah, Karan Aujla!)
-                    [00:06.00] Husan tera tauba tauba
-                    [00:12.00] Chadhdi jawani tauba tauba
-                    [00:18.00] Akh da nishana tauba tauba
-                    [00:24.00] Dil kare bechain tauba tauba
-                    [00:30.00] Tauba tauba, tauba tauba!
-                """.trimIndent(),
-                genre = "Punjabi Pop",
-                mood = "Groovy",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "saavn_aaj_ki_raat",
-                title = "Aaj Ki Raat",
-                artist = "Sachin-Jigar, Madhubanti Bagchi, Divya Kumar",
-                album = "Stree 2",
-                durationMs = 228000L,
-                audioUrl = "https://aac.saavncdn.com/373/36b1b3637cdeedfaa9a9012453948aa6_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/373/Stree-2-Hindi-2024-20240828083834-500x500.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Thumping Dance Beats)
-                    [00:06.00] Aaj ki raat maza husn ka aankhon se lijiye
-                    [00:14.00] Dil mein bitha ke rakhiye
-                    [00:20.00] Thoda sa hosh khoyi, thoda behak lijiye
-                    [00:28.00] Aaj ki raat maza husn ka aankhon se lijiye
-                """.trimIndent(),
-                genre = "Bollywood Item",
-                mood = "Dance",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "saavn_kesariya",
-                title = "Kesariya",
-                artist = "Arijit Singh, Pritam",
-                album = "Brahmastra",
-                durationMs = 268000L,
-                audioUrl = "https://aac.saavncdn.com/871/c2febd353f3a076a406fa37510f31f9f_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/871/Brahmastra-Original-Motion-Picture-Soundtrack-Hindi-2022-20221006155213-500x500.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Romantic Flute & Acoustic Intro)
-                    [00:06.00] Mujhko itna bataye koi
-                    [00:12.00] Kaise tujhse dil na lagaye koi
-                    [00:18.00] Rabba ne tujhko banane mein
-                    [00:24.00] Kar di hai husn ki khaali tijoriyan
-                    [00:30.00] Kajal ki siyahi se likhi hai tune
-                    [00:36.00] Jaane kitno ki love storiyan
-                    [00:43.00] Kesariya tera ishq hai piya
-                    [00:49.00] Rang jaaun jo main haath lagaun
-                """.trimIndent(),
-                genre = "Bollywood",
-                mood = "Romance",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "saavn_millionaire",
-                title = "Millionaire",
-                artist = "Yo Yo Honey Singh",
-                album = "GLORY",
-                durationMs = 200000L,
-                audioUrl = "https://aac.saavncdn.com/173/4528cbe9b2ceba863a8e2e92c2da2882_320.mp4",
-                albumArtUrl = "https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Yo Yo Honey Singh!)
-                    [00:05.00] Main ban gaya millionaire
-                    [00:10.00] Jeb mein dollar, aankhon mein flair
-                    [00:15.00] Duniya dekhe meri raftaar
-                    [00:20.00] Desi hip hop ka superstar!
-                """.trimIndent(),
-                genre = "Hip-Hop",
-                mood = "Hype",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "yt_IJq0yyWug1k",
-                title = "Tum Hi Ho",
-                artist = "Arijit Singh",
-                album = "Aashiqui 2",
-                durationMs = 262000L,
-                audioUrl = "https://aac.saavncdn.com/264/3df8a213e4b7858cfa9900c430fa728c_320.mp4",
-                albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music124/v4/2d/11/b9/2d11b994-b4fa-19eb-953d-70b472165e95/8903431566911_cover.jpg/600x600bb.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Gentle Piano & Acoustic Melody)
-                    [00:04.00] Hum tere bin ab reh nahi sakte
-                    [00:13.00] Tere bina kya wajood mera
-                    [00:22.00] Tujhse juda agar ho jayenge
-                    [00:31.00] Toh khud se hi ho jayenge juda
-                    [00:40.00] Kyunki tum hi ho, ab tum hi ho
-                    [00:49.00] Zindagi ab tum hi ho
-                    [00:58.00] Chain bhi, mera dard bhi
-                    [01:07.00] Meri aashiqui ab tum hi ho
-                """.trimIndent(),
-                genre = "Bollywood Romance",
-                mood = "Soulful",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "yt_5Eqb_-j3FDA",
-                title = "Pasoori",
-                artist = "Ali Sethi x Shae Gill",
-                album = "Coke Studio Season 14",
-                durationMs = 224000L,
-                audioUrl = "https://aac.saavncdn.com/392/689a74aa9bc3b624b45ce7508cf31c77_320.mp4",
-                albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music116/v4/f3/f9/06/f3f906c3-79d5-ac9a-5fdd-262048f955f9/cover.jpg/600x600bb.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Agg laavan majboori nu)
-                    [00:05.00] Aan jaan di pasoori nu
-                    [00:13.00] Zahar bane haan teri pee jaavan
-                    [00:21.00] Marjaavan ya jee jaavan
-                    [00:29.00] Dil boliyan te aave
-                    [00:37.00] Aavan te dil lag jaave
-                """.trimIndent(),
-                genre = "Indie Fusion",
-                mood = "Groovy",
-                isLiked = false
-            ),
-            SongEntity(
-                id = "yt_ElZfdU54Cp8",
-                title = "Apna Bana Le",
-                artist = "Arijit Singh & Sachin-Jigar",
-                album = "Bhediya",
-                durationMs = 261000L,
-                audioUrl = "https://aac.saavncdn.com/308/879685a21eb234c98e169527ecb82b6b_320.mp4",
-                albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music122/v4/2e/0b/c0/2e0bc070-112f-a827-6ad8-6bc64f7caaff/840214460180.png/600x600bb.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Soft guitar strumming)
-                    [00:06.00] Tu mera koi na hoke bhi kuch laage
-                    [00:14.00] Kiya re jo bhi tune kaise kiya re
-                    [00:22.00] Jiya ko mere baandh aise liya re
-                    [00:30.00] Samajh ke bhi na samajh main saku
-                    [00:38.00] Apna bana le piya, apna bana le piya
-                """.trimIndent(),
-                genre = "Bollywood",
-                mood = "Heartfelt",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "yt_Wv2rLZmbPMA",
-                title = "Chaleya",
-                artist = "Arijit Singh & Shilpa Rao",
-                album = "Jawan",
-                durationMs = 200000L,
-                audioUrl = "https://aac.saavncdn.com/475/8863f6087b32d326dae004a600d9a690_320.mp4",
-                albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music126/v4/bb/f4/f5/bbf4f511-3c12-c25e-a475-b6d06faa8c13/8902894362047_cover.jpg/600x600bb.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Anirudh Beat Drop)
-                    [00:05.00] Ishq mein dil bana hai, ishq mein dil fanaa hai
-                    [00:13.00] Jitna bhi roko dil ko, utna hi dil bada hai
-                    [00:21.00] Chaleya teri ore chaleya
-                """.trimIndent(),
-                genre = "Bollywood Dance",
-                mood = "Energetic",
-                isLiked = false
-            ),
-            SongEntity(
-                id = "yt_VNs_cCtdbPc",
-                title = "Brown Munde",
-                artist = "AP Dhillon, Gurinder Gill",
-                album = "Brown Munde",
-                durationMs = 267000L,
-                audioUrl = "https://aac.saavncdn.com/973/7710b144cb742f1cf59f5b610c144a6d_320.mp4",
-                albumArtUrl = "https://is1-ssl.mzstatic.com/image/thumb/Music211/v4/26/a3/ac/26a3ac64-69e4-95ec-80ab-1f5a477537d2/859742042973_cover.jpg/600x600bb.jpg",
-                lyricsLrc = """
-                    [00:00.00] (Trap Punjabi Beats)
-                    [00:06.00] Desi jehe geet aa trappan jehi beat aa
-                    [00:13.00] Sir kadd gajde speakeran ch wajde
-                    [00:20.00] Brown munde, brown munde
-                """.trimIndent(),
-                genre = "Punjabi Hip-Hop",
-                mood = "Hype",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "yt_n_FCrCQ6-9U",
-                title = "295",
-                artist = "Sidhu Moose Wala",
-                album = "Moosetape",
-                durationMs = 270000L,
-                audioUrl = "https://aac.saavncdn.com/431/e4f20532454a85fa0a94460f4eb78996_320.mp4",
-                albumArtUrl = "https://images.unsplash.com/photo-1493225457124-a3eb161ffa5f?w=600&auto=format&fit=crop&q=80",
-                lyricsLrc = """
-                    [00:00.00] (Heavy 808 Punjabi Beat Drops)
-                    [00:06.00] Sidhu Moose Wala
-                    [00:10.00] The Kidd!
-                    [00:14.00] Dass kihda aithey sach bolda
-                    [00:19.00] Kihda rab de naal match karda
-                """.trimIndent(),
-                genre = "Punjabi",
-                mood = "Party",
-                isLiked = true
-            ),
-            SongEntity(
-                id = "yt_mH_LFkWxpI0",
-                title = "Lover",
-                artist = "Diljit Dosanjh",
-                album = "MoonChild Era",
-                durationMs = 210000L,
-                audioUrl = "https://aac.saavncdn.com/745/e4db870813e3bc3101d2ae0a09e0722c_320.mp4",
-                albumArtUrl = "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80",
-                lyricsLrc = """
-                    [00:00.00] (Synthesizer & Upbeat Pop Rhythm)
-                    [00:05.00] Diljit Dosanjh!
-                    [00:08.00] Intense music
-                    [00:12.00] Tera ni lover, tera ni lover
-                """.trimIndent(),
-                genre = "Punjabi Pop",
-                mood = "Party",
-                isLiked = false
-            )
-        )
+        private suspend fun fetchAndSeedDynamicSongsFromDatabase() {
+        try {
+            songDao.purgeDummySongs()
+        } catch (_: Exception) {}
 
-        sampleSongs.forEach { songDao.insertSong(it) }
+        // 1. Fetch dynamic songs directly from Firestore database
+        try {
+            val dynamicFirestore = firestoreMusicRepo.getDynamicSongs(35)
+            if (dynamicFirestore.isNotEmpty()) {
+                val cleaned = com.resso.craka.util.SongDeduplicator.deduplicateList(dynamicFirestore)
+                songDao.insertSongs(cleaned)
+                Log.i("MusicRepository", "Successfully loaded ${cleaned.size} dynamic songs from Firestore database")
+                return
+            }
+        } catch (e: Exception) {
+            Log.w("MusicRepository", "Firestore dynamic fetch note: ${e.message}")
+        }
 
-        // Seed some sample comments
-        val sampleComments = listOf(
-            CommentEntity(
-                songId = "saavn_payal",
-                userName = "Aarav Sharma",
-                userAvatarColor = 0xFFFF2A6DL,
-                content = "Honey Singh & Paradox colab is fire! Repeat mode on 🔥",
-                songTimestampMs = 25000L,
-                likesCount = 142,
-                isLikedByMe = true
-            ),
-            CommentEntity(
-                songId = "saavn_payal",
-                userName = "Sneha Patel",
-                userAvatarColor = 0xFF05D9E8L,
-                content = "Pure nostalgia vibe with modern 320kbps beats!",
-                songTimestampMs = 60000L,
-                likesCount = 89,
-                isLikedByMe = false
-            ),
-            CommentEntity(
-                songId = "yt_IJq0yyWug1k",
-                userName = "Rohan Verma",
-                userAvatarColor = 0xFFFFE600L,
-                content = "The synced lyrics and flash beat on Resso are unbeatable! Love this vibe.",
-                songTimestampMs = 15000L,
-                likesCount = 37,
-                isLikedByMe = false
-            ),
-            CommentEntity(
-                songId = "saavn_kesariya",
-                userName = "Priya Roy",
-                userAvatarColor = 0xFF00F5D4L,
-                content = "Arijit Singh voice + Resso lyrics poster studio = perfection ❤️",
-                songTimestampMs = 24000L,
-                likesCount = 56,
-                isLikedByMe = false
-            )
-        )
-        sampleComments.forEach { commentDao.insertComment(it) }
+        // 2. Fetch from Firestore cached_songs
+        try {
+            val firestoreRepo = FirestoreRepository.getInstance(appContext)
+            val cached = firestoreRepo.getAllCachedSongs(35)
+            if (cached.isNotEmpty()) {
+                val entities = com.resso.craka.util.SongDeduplicator.deduplicateList(cached.map { it.toSongEntity() })
+                songDao.insertSongs(entities)
+                Log.i("MusicRepository", "Loaded ${entities.size} songs from Firestore cached_songs")
+                return
+            }
+        } catch (e: Exception) {
+            Log.w("MusicRepository", "Firestore cached_songs fetch note: ${e.message}")
+        }
 
-        // Seed sample playlist
-        playlistDao.insertPlaylist(
-            PlaylistEntity(
-                name = "Late Night Vibes ✨",
-                description = "Romantic, soulful and high-energy hits for late night thoughts",
-                songIdsCsv = "saavn_payal,saavn_tauba_tauba,saavn_aaj_ki_raat,saavn_kesariya,saavn_millionaire"
-            )
-        )
+        // 3. Dynamic online fetch from YouTube Music API via Vercel (real songs, zero dummy)
+        try {
+            val freshTrending = searchService.getTrendingSongs(35)
+            if (freshTrending.isNotEmpty()) {
+                val cleaned = com.resso.craka.util.SongDeduplicator.deduplicateList(freshTrending)
+                songDao.insertSongs(cleaned)
+                firestoreMusicRepo.saveSongsBatch(cleaned)
+                Log.i("MusicRepository", "Fetched & cached ${cleaned.size} real trending songs from online API to Firestore")
+                return
+            }
+        } catch (e: Exception) {
+            Log.w("MusicRepository", "Online trending fetch note: ${e.message}")
+        }
     }
 }

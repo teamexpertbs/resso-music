@@ -115,14 +115,14 @@ class PlaybackSequenceTest {
 
     @Test
     fun testSongDeduplicationPreventsReplayLoops() {
-        val song1 = createSong("saavn_tauba_tauba", "Tauba Tauba")
-        val song2 = createSong("saavn_998811", "Tauba Tauba (From \"Bad Newz\")")
-        val song3 = createSong("saavn_payal", "Payal")
-        val song4 = createSong("saavn_445566", "Payal (Glory)")
-        val song5 = createSong("saavn_kesariya", "Kesariya")
-        val song6 = createSong("saavn_112233", "Kesariya - Film Version")
-        val song7 = createSong("saavn_millionaire", "Millionaire")
-        val song8 = createSong("saavn_778899", "Millionaire (Glory)")
+        val song1 = createSong("yt_tauba_tauba", "Tauba Tauba")
+        val song2 = createSong("yt_998811", "Tauba Tauba (From \"Bad Newz\")")
+        val song3 = createSong("yt_payal", "Payal")
+        val song4 = createSong("yt_445566", "Payal (Glory)")
+        val song5 = createSong("yt_kesariya", "Kesariya")
+        val song6 = createSong("yt_112233", "Kesariya - Film Version")
+        val song7 = createSong("yt_millionaire", "Millionaire")
+        val song8 = createSong("yt_778899", "Millionaire (Glory)")
 
         // Verify duplicates detection
         org.junit.Assert.assertTrue(com.resso.craka.util.SongDeduplicator.isSameOrDuplicate(song1, song2))

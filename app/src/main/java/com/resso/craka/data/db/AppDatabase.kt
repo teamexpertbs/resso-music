@@ -24,6 +24,9 @@ interface SongDao {
     @Query("DELETE FROM songs WHERE id LIKE 'local_%'")
     suspend fun purgeLocalSongs()
 
+    @Query("DELETE FROM songs WHERE id LIKE 'saavn_%' OR id LIKE 'yt_sample_%' OR id IN ('yt_a-PAcmi5Kas','yt_IJq0yyWug1k','yt_5Eqb_-j3FDA','yt_BddP6PYo2gs','yt_n_FCrCQ6-9U')")
+    suspend fun purgeDummySongs()
+
     @Query("SELECT * FROM songs WHERE id = :id LIMIT 1")
     suspend fun getSongById(id: String): SongEntity?
 

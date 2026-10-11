@@ -87,9 +87,6 @@ class RessoApplication : Application(), ImageLoaderFactory {
                         "Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 " +
                             "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
                     )
-                if (host.contains("saavncdn.com") || host.contains("jiosaavn.com")) {
-                    builder.header("Referer", "https://www.jiosaavn.com/")
-                }
                 if (host.contains("ytimg") || host.contains("ggpht") || host.contains("googleusercontent")) {
                     builder.header("Referer", "https://www.youtube.com/")
                 }

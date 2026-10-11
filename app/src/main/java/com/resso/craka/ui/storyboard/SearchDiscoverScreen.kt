@@ -323,7 +323,7 @@ fun SearchDiscoverScreen(
                     val releases = listOf(
                         Triple("Jawan", "Album · 2023", "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=600&auto=format&fit=crop&q=80"),
                         Triple("Maan Meri Jaan", "Single · 2023", "https://images.unsplash.com/photo-1470225620780-dba8ba36b745?w=600&auto=format&fit=crop&q=80"),
-                        Triple("GLORY", "Honey Singh · 2024", "https://c.saavncdn.com/173/GLORY-Hindi-2024-20250117161048-500x500.jpg")
+                        Triple("GLORY", "Honey Singh · 2024", "https://images.unsplash.com/photo-1511671782779-c97d3d27a1d4?w=600&auto=format&fit=crop&q=80")
                     )
 
                     LazyRow(

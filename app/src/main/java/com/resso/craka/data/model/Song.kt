@@ -35,7 +35,7 @@ data class Song(
             !telegramUrl.isNullOrBlank() -> telegramUrl!!
             streamUrl.isNotBlank() && !streamUrl.contains("vercel.app") && (streamUrl.contains(".mp4") || streamUrl.contains(".mp3") || streamUrl.contains(".m4a") || streamUrl.contains("telegram.org")) -> streamUrl
             playUrl.isNotBlank() && !playUrl.contains("vercel.app") && (playUrl.contains(".mp4") || playUrl.contains(".mp3") || playUrl.contains(".m4a") || playUrl.contains("telegram.org")) -> playUrl
-            else -> "https://youtu.be/$id"
+            else -> "https://music-api-lime-nine.vercel.app/play/$id"
         }
         return SongEntity(
             id = id,

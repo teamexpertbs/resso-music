@@ -257,4 +257,72 @@ class FirestoreRepository private constructor(private val context: Context) {
 
         awaitClose { listener.remove() }
     }.flowOn(Dispatchers.IO)
+
+    /**
+     * Real-time stream of all songs from Firestore database collection "cached_songs".
+     * Ordered by latest added/updated so newly discovered and cached songs always show up first!
+     */
+    fun getCachedSongsFlow(limit: Int = 50): Flow<List<Song>> = callbackFlow {
+        val listener = db.collection(COLLECTION_CACHED_SONGS)
+            .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+            .limit(limit.toLong())
+            .addSnapshotListener { snapshot, error ->
+                if (error != null) {
+                    Log.w(TAG, "Listen failed for cached songs: ${error.message}")
+                    return@addSnapshotListener
+                }
+                val songs = snapshot?.documents?.mapNotNull { doc ->
+                    val id = doc.getString("id") ?: doc.id
+                    val title = doc.getString("title") ?: ""
+                    if (title.isNotBlank() && id.isNotBlank()) {
+                        Song(
+                            id = id,
+                            title = title,
+                            artist = doc.getString("artist") ?: "",
+                            thumbnail = doc.getString("thumbnail") ?: "",
+                            duration = doc.getString("duration") ?: "",
+                            views = doc.getString("views") ?: "",
+                            telegramUrl = doc.getString("telegram_url")?.takeIf { it.isNotBlank() },
+                            timestamp = doc.getLong("timestamp") ?: 0L
+                        )
+                    } else null
+                } ?: emptyList()
+                trySend(songs)
+            }
+
+        awaitClose { listener.remove() }
+    }.flowOn(Dispatchers.IO)
+
+    /**
+     * Direct query of cached songs from Firestore database collection "cached_songs".
+     */
+    suspend fun getAllCachedSongs(limit: Int = 50): List<Song> = withContext(Dispatchers.IO) {
+        try {
+            val snapshot = db.collection(COLLECTION_CACHED_SONGS)
+                .orderBy("timestamp", com.google.firebase.firestore.Query.Direction.DESCENDING)
+                .limit(limit.toLong())
+                .get()
+                .await()
+
+            snapshot.documents.mapNotNull { doc ->
+                val id = doc.getString("id") ?: doc.id
+                val title = doc.getString("title") ?: ""
+                if (title.isNotBlank() && id.isNotBlank()) {
+                    Song(
+                        id = id,
+                        title = title,
+                        artist = doc.getString("artist") ?: "",
+                        thumbnail = doc.getString("thumbnail") ?: "",
+                        duration = doc.getString("duration") ?: "",
+                        views = doc.getString("views") ?: "",
+                        telegramUrl = doc.getString("telegram_url")?.takeIf { it.isNotBlank() },
+                        timestamp = doc.getLong("timestamp") ?: 0L
+                    )
+                } else null
+            }
+        } catch (e: Exception) {
+            Log.w(TAG, "Error fetching cached songs from Firestore: ${e.message}")
+            emptyList()
+        }
+    }
 }

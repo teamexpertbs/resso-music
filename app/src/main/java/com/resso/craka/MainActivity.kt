@@ -39,7 +39,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
-import com.pierfrancescosoffritti.androidyoutubeplayer.core.player.views.YouTubePlayerView
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.width
 import androidx.compose.material.icons.Icons
@@ -64,10 +63,9 @@ import com.resso.craka.ui.sidebar.SidebarDrawerContent
 import kotlinx.coroutines.launch
 import com.resso.craka.data.model.Song
 import com.resso.craka.data.model.toSong
-import com.resso.craka.player.YouTubeMusicPlayerManager
 import com.resso.craka.ui.compose.BottomMiniPlayer
 import com.resso.craka.ui.compose.HomeScreen
-import com.resso.craka.ui.player.VibePlayerScreen
+import com.resso.craka.ui.compose.PlayerScreen
 import com.resso.craka.ui.theme.MyApplicationTheme
 import com.resso.craka.ui.viewmodel.MusicViewModel
 
@@ -106,10 +104,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onDestroy() {
-        super.onDestroy()
-        YouTubeMusicPlayerManager.release()
-    }
+
 }
 
 @Composable
@@ -121,6 +116,7 @@ fun MainMusicApp(viewModel: MusicViewModel) {
     val allSongsFromDb by viewModel.allSongs.collectAsState()
     val likedSongsFromFirestore by viewModel.firestoreLikedSongs.collectAsState()
     val historySongsFromFirestore by viewModel.firestoreHistorySongs.collectAsState()
+    val cachedSongsFromFirestore by viewModel.firestoreCachedSongs.collectAsState()
 
     val searchResultsEntities by viewModel.searchResults.collectAsState()
     val searchResults = remember(searchResultsEntities) {
@@ -137,14 +133,15 @@ fun MainMusicApp(viewModel: MusicViewModel) {
     val repeatMode by viewModel.repeatMode.collectAsState()
     val queue by viewModel.currentQueueSongModels.collectAsState()
 
-    // Determine trending songs: prefer Vercel API results or fallback to DB/repo
-    val trendingSongs = remember(songsListFromApi, allSongsFromDb) {
-        if (songsListFromApi.isNotEmpty()) {
-            songsListFromApi
-        } else if (allSongsFromDb.isNotEmpty()) {
-            allSongsFromDb.map { it.toSong() }
-        } else {
-            emptyList()
+    // Determine trending songs: ALWAYS show dynamic real songs from Firestore Database & Online API, 0 dummy songs
+    val trendingSongs = remember(songsListFromApi, cachedSongsFromFirestore, allSongsFromDb) {
+        when {
+            songsListFromApi.isNotEmpty() -> songsListFromApi
+            cachedSongsFromFirestore.isNotEmpty() -> cachedSongsFromFirestore
+            allSongsFromDb.isNotEmpty() -> {
+                allSongsFromDb.filter { !it.id.startsWith("saavn_") && !it.id.startsWith("yt_sample_") }.map { it.toSong() }
+            }
+            else -> emptyList()
         }
     }
 
@@ -207,28 +204,7 @@ fun MainMusicApp(viewModel: MusicViewModel) {
                     .fillMaxSize()
                     .padding(innerPadding)
             ) {
-                // 1. Background YouTube Player View (Rendered with alpha 1.0 behind HomeScreen for active media playback)
-                AndroidView(
-                    factory = { context ->
-                        val frameLayout = FrameLayout(context).apply {
-                            layoutParams = ViewGroup.LayoutParams(240, 160)
-                        }
-                        val ytView = YouTubePlayerView(context).apply {
-                            layoutParams = FrameLayout.LayoutParams(
-                                FrameLayout.LayoutParams.MATCH_PARENT,
-                                FrameLayout.LayoutParams.MATCH_PARENT
-                            )
-                        }
-                        frameLayout.addView(ytView)
-                        YouTubeMusicPlayerManager.attachPlayerView(ytView)
-                        frameLayout
-                    },
-                    modifier = Modifier
-                        .size(240.dp, 160.dp)
-                        .align(Alignment.BottomEnd)
-                )
-
-                // 2. Active Screen based on currentBottomTab
+                // Active Screen based on currentBottomTab
                 when (currentBottomTab) {
                     "home" -> HomeScreen(
                         trendingSongs = trendingSongs,
@@ -382,23 +358,31 @@ fun MainMusicApp(viewModel: MusicViewModel) {
                     }
                 }
 
-                // 4. Full Screen Resso Vibe Player (Expands with vertical swipe, lyrics, vinyl, and controls)
+                // 4. Full Screen AMOLED Player
                 AnimatedVisibility(
                     visible = isPlayerExpanded,
                     enter = slideInVertically(initialOffsetY = { it }),
                     exit = slideOutVertically(targetOffsetY = { it })
                 ) {
-                    VibePlayerScreen(
-                        viewModel = viewModel,
+                    PlayerScreen(
+                        song = currentSong,
+                        isPlaying = isPlaying,
+                        isLiked = isCurrentSongLiked,
+                        currentPositionMs = currentPositionMs,
+                        totalDurationMs = durationMs,
+                        isShuffle = isShuffle,
+                        isRepeat = repeatMode != 0,
+                        queue = queue,
+                        currentIndex = currentIndex,
                         onCollapse = { isPlayerExpanded = false },
-                        onNavigateToSearch = {
-                            isPlayerExpanded = false
-                            currentBottomTab = "explore"
-                        },
-                        onOpenSidebar = {
-                            isPlayerExpanded = false
-                            coroutineScope.launch { drawerState.open() }
-                        },
+                        onPlayPause = { viewModel.togglePlayPause() },
+                        onNext = { viewModel.playNextSong() },
+                        onPrevious = { viewModel.playPreviousSong() },
+                        onSeekTo = { viewModel.seekTo(it) },
+                        onToggleLike = { viewModel.toggleLikeSong(it) },
+                        onToggleShuffle = { viewModel.toggleShuffle() },
+                        onToggleRepeat = { viewModel.cycleRepeatMode() },
+                        onSelectQueueItem = { idx -> viewModel.playSongAtIndex(idx) },
                         modifier = Modifier.fillMaxSize()
                     )
                 }

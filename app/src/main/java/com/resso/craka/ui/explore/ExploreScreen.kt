@@ -162,7 +162,7 @@ fun ExploreScreen(
         } else if (trendingSongs.isNotEmpty()) {
             trendingSongs
         } else {
-            allSongs
+            allSongs.filter { !it.id.startsWith("saavn_") && !it.id.startsWith("yt_sample_") }
         }
 
         if (selectedMood == null) {
@@ -672,7 +672,7 @@ fun ExploreScreen(
                         onToggleLike = {
                             viewModel.toggleLikeSong(song)
                         },
-                        isOnline = song.id.startsWith("online_") || song.id.startsWith("saavn_"),
+                        isOnline = true,
                         isFirestoreResult = isFirestore
                     )
                 }

@@ -6,7 +6,7 @@ import com.resso.craka.data.model.SongEntity
  * Intelligent Song Deduplication Utility.
  * Normalizes song titles, artists, and metadata to eliminate duplicate replays,
  * remakes, and redundant catalog variations (e.g., "(From 'Bad Newz')", "(From 'GLORY')",
- * "(Remix)", "(Official Video)", different JioSaavn IDs for the same track).
+ * "(Remix)", "(Official Video)", different song IDs for the same track).
  */
 object SongDeduplicator {
 

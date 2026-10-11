@@ -308,22 +308,51 @@ fun HomeScreen(
                         .weight(1f),
                     contentAlignment = Alignment.Center
                 ) {
-                    val emptyMessage = if (isSearchModeActive) {
-                        "No results found for \"$searchQuery\".\nTry searching for another song or artist."
-                    } else {
-                        when (selectedTab) {
-                            1 -> "No liked songs yet.\nTap the heart icon on any song to save favorites!"
-                            2 -> "No playback history yet.\nPlay songs to build your history."
-                            else -> "Loading trending music..."
+                    if (!isSearchModeActive && selectedTab == 0) {
+                        Column(
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.Center,
+                            modifier = Modifier.padding(24.dp)
+                        ) {
+                            CircularProgressIndicator(
+                                color = Color(0xFFFF2D3A),
+                                modifier = Modifier.size(36.dp),
+                                strokeWidth = 3.dp
+                            )
+                            Spacer(modifier = Modifier.height(16.dp))
+                            Text(
+                                text = "Loading fresh songs from Cloud Database...",
+                                color = Color(0xFFCCCCCC),
+                                fontSize = 14.sp,
+                                fontWeight = androidx.compose.ui.text.font.FontWeight.Medium,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
+                            Spacer(modifier = Modifier.height(6.dp))
+                            Text(
+                                text = "Zero dummy songs · 100% live streaming",
+                                color = Color(0xFF666666),
+                                fontSize = 12.sp,
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                            )
                         }
+                    } else {
+                        val emptyMessage = if (isSearchModeActive) {
+                            "No results found for \"$searchQuery\".\nTry searching for another song or artist."
+                        } else {
+                            when (selectedTab) {
+                                1 -> "No liked songs yet.\nTap the heart icon on any song to save favorites!"
+                                2 -> "No playback history yet.\nPlay songs to build your history."
+                                else -> "Loading songs..."
+                            }
+                        }
+                        Text(
+                            text = emptyMessage,
+                            color = Color(0xFF777777),
+                            fontSize = 14.sp,
+                            textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                            modifier = Modifier.padding(24.dp)
+                        )
                     }
-                    Text(
-                        text = emptyMessage,
-                        color = Color(0xFF777777),
-                        fontSize = 14.sp,
-                        textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                        modifier = Modifier.padding(24.dp)
-                    )
                 }
             } else {
                 LazyColumn(
